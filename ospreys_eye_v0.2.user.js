@@ -1,6 +1,6 @@
 // ==UserScript==
 // @name         Osprey's Eye - Torn Stat Estimator (v0.2)
-// @namespace    https://greasyfork.org/en/users/123456-osprey
+// @namespace    https://github.com/HomieWrecker/Osprey-s-Eye
 // @version      0.2
 // @description  Estimate enemy stats and fair fight outcomes using Torn API when available. Prompts for API key if missing.
 // @author       Homiewrecker
