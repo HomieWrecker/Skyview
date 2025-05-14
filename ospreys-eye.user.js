@@ -1,4 +1,4 @@
-// ==UserScript==
+//==UserScript==
 // @name         Osprey's Eye - Torn Stat Estimator (v1.2)
 // @namespace    https://github.com/HomieWrecker/Osprey-s-Eye
 // @version      1.2
