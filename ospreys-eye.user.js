@@ -2,7 +2,7 @@
 // @name         Osprey's Eye
 // @namespace    https://torn.com/
 // @version      1.0.0
-// @description  Spy estimator and Fair Fight tool with Torn API, TornStats, and TornPal integration
+// @description  Test runner
 // @author       Homiewrecker
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
@@ -17,8 +17,8 @@
 // @license      MIT
 // ==/UserScript==
 
-// Osprey's Eye - Full Bundle
-// Integrated spy engine, TornPal FF, TornStats fallback, custom settings UI, and FF/Stats display logic.
+// Osprey's Eye
+// Integrated spy engine with custom logic.
 
 (function () {
   "use strict";
