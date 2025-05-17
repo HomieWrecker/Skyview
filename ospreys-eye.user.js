@@ -2,7 +2,7 @@
 // @name         Osprey's Eye
 // @namespace    https://torn.com/
 // @version      1.0.0
-// @description  Fight tool with custom logic
+// @description  Spy estimator and Fair Fight tool with Torn API, TornStats, and TDUP logic
 // @author       Homiewrecker
 // @match        https://www.torn.com/*
 // @grant        GM_xmlhttpRequest
