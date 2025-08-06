@@ -213,7 +213,7 @@
         async authenticate() {
             let credentials = GM_getValue('brotherOwl_credentials', null);
             
-            if (!credentials) {
+            if (!credentials || !credentials.apiKey) {
                 return false;
             }
             
@@ -222,8 +222,7 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     data: JSON.stringify({
-                        action: 'verify',
-                        discordId: credentials.discordId,
+                        action: 'verify-api-key',
                         apiKey: credentials.apiKey
                     })
                 });
@@ -511,7 +510,6 @@
             try {
                 const payload = {
                     ...data,
-                    discordId: this.credentials.discordId,
                     apiKey: this.credentials.apiKey
                 };
                 
