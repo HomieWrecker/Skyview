@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BOS
 // @namespace    Brother Owl's Skyview
-// @version      3.2.3
+// @version      3.2.4
 // @author       Homiewrecker
 // @description  Advanced battle intelligence and stat estimation for Torn PDA
 // @icon         🦉
@@ -59,7 +59,7 @@
         }
         
         async init() {
-            this.log('🦉 Brother Owl Skyview v3.2.3 - Initializing...');
+            this.log('🦉 Brother Owl Skyview v3.2.4 - Initializing...');
             this.addStyles();
             this.setupUI();
             
@@ -182,7 +182,7 @@
                         data: JSON.stringify({
                             action: 'verify-api-key',
                             apiKey: this.apiKey,
-                            userscriptVersion: '3.2.3'
+                            userscriptVersion: '3.2.4'
                         })
                     });
                     
@@ -342,12 +342,9 @@
             if (!statsContent) return;
             
             try {
-                // Extract player info from page
+                // Extract comprehensive player info from page
                 const playerInfo = this.extractPlayerInfo();
-                if (!playerInfo.playerId) {
-                    statsContent.innerHTML = 'Player information not available';
-                    return;
-                }
+                this.log(`🔍 Scraped player data: ${JSON.stringify(playerInfo)}`);
                 
                 statsContent.innerHTML = `
                     <div style="display: flex; gap: 15px; flex-wrap: wrap;">
@@ -360,39 +357,359 @@
                     </div>
                 `;
                 
-                // Simulate intelligence analysis
-                setTimeout(() => {
-                    statsContent.innerHTML = `
-                        <div style="display: flex; gap: 15px; flex-wrap: wrap;">
-                            <div><strong>Battle Rating:</strong> <span style="color: #4CAF50;">Moderate Threat</span></div>
-                            <div><strong>Fair Fight:</strong> <span style="color: #FFC107;">~85% Chance</span></div>
-                            <div><strong>Activity:</strong> <span style="color: #2196F3;">Active Today</span></div>
-                        </div>
-                        <div style="margin-top: 5px; font-size: 11px; opacity: 0.8;">
-                            Last updated: ${new Date().toLocaleTimeString()}
-                        </div>
-                    `;
-                }, 2000);
+                // Perform actual Brother Owl intelligence analysis
+                const intelligenceData = await this.getBrotherOwlIntelligence(playerInfo);
+                
+                // Get battle stats analysis (from backend or local estimation)
+                const analysisData = intelligenceData || this.generateBattleStatsEstimate(playerInfo);
+                
+                statsContent.innerHTML = `
+                    <div style="display: flex; gap: 15px; flex-wrap: wrap; margin-bottom: 8px;">
+                        <div><strong>Battle Rating:</strong> <span style="color: #4CAF50;">${analysisData.battleRating}</span></div>
+                        <div><strong>Fair Fight:</strong> <span style="color: #FFC107;">${analysisData.fairFightChance}</span></div>
+                        <div><strong>Activity:</strong> <span style="color: #2196F3;">${analysisData.activityStatus}</span></div>
+                    </div>
+                    <div style="margin-bottom: 5px; font-size: 11px; color: #666;">
+                        <div><strong>Total Stats:</strong> ${analysisData.totalStats}</div>
+                        <div style="margin-top: 2px;">${analysisData.breakdown}</div>
+                    </div>
+                    <div style="font-size: 10px; opacity: 0.7;">
+                        ${playerInfo.playerName} [Level ${playerInfo.level}] • ${analysisData.statsFound ? 'Scraped' : 'Estimated'} • ${new Date().toLocaleTimeString()}
+                    </div>
+                `;
                 
             } catch (error) {
                 this.logError('Battle stats analysis failed', error);
-                statsContent.innerHTML = 'Analysis temporarily unavailable';
+                // Even on error, provide basic estimates based on scraped data
+                const playerInfo = this.extractPlayerInfo();
+                const fallbackStats = this.generateBattleStatsEstimate(playerInfo);
+                statsContent.innerHTML = `
+                    <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                        <div><strong>Battle Rating:</strong> <span style="color: #4CAF50;">${fallbackStats.battleRating}</span></div>
+                        <div><strong>Fair Fight:</strong> <span style="color: #FFC107;">${fallbackStats.fairFightChance}</span></div>
+                        <div><strong>Activity:</strong> <span style="color: #2196F3;">${fallbackStats.activityStatus}</span></div>
+                    </div>
+                    <div style="margin-top: 5px; font-size: 11px; opacity: 0.8;">
+                        Basic estimate • ${new Date().toLocaleTimeString()}
+                    </div>
+                `;
             }
         }
         
+        async getBrotherOwlIntelligence(playerInfo) {
+            if (!this.isAuthenticated || !this.currentEndpoint) {
+                return null;
+            }
+            
+            try {
+                this.log('🧠 Requesting Brother Owl intelligence analysis...');
+                const response = await this.makeRequest(`${this.currentEndpoint}/api/skyview-intelligence`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    data: JSON.stringify({
+                        apiKey: this.apiKey,
+                        playerData: playerInfo,
+                        analysisType: 'battle-stats-estimation'
+                    })
+                });
+                
+                if (response && response.success) {
+                    this.log('✅ Intelligence analysis received');
+                    return response.intelligence;
+                }
+            } catch (error) {
+                this.log(`⚠️ Intelligence service unavailable: ${error.message}`);
+            }
+            return null;
+        }
+        
+        generateBattleStatsEstimate(playerInfo) {
+            this.log('🧮 Generating battle stats estimates...');
+            
+            const level = playerInfo.level || 1;
+            const battleStats = playerInfo.battleStats;
+            
+            let analysisData = {};
+            
+            // If we have actual battle stats, analyze them
+            if (battleStats.found) {
+                const total = battleStats.total || (battleStats.strength + battleStats.defense + battleStats.speed + battleStats.dexterity);
+                
+                analysisData = {
+                    battleRating: this.categorizeBattleStats(total, level),
+                    fairFightChance: this.calculateFairFightChance(total, level),
+                    activityStatus: this.determineActivityStatus(playerInfo.profileIntelligence),
+                    statsFound: true,
+                    totalStats: total ? total.toLocaleString() : 'Calculating...',
+                    breakdown: `STR: ${battleStats.strength || '?'} | DEF: ${battleStats.defense || '?'} | SPD: ${battleStats.speed || '?'} | DEX: ${battleStats.dexterity || '?'}`
+                };
+            } else {
+                // Provide level-based estimates when stats aren't found
+                const estimatedTotal = this.estimateStatsFromLevel(level);
+                
+                analysisData = {
+                    battleRating: this.categorizeBattleStats(estimatedTotal, level),
+                    fairFightChance: this.calculateFairFightChance(estimatedTotal, level),
+                    activityStatus: this.determineActivityStatus(playerInfo.profileIntelligence),
+                    statsFound: false,
+                    totalStats: `~${estimatedTotal.toLocaleString()} (Est.)`,
+                    breakdown: 'Stats private - using level-based estimation'
+                };
+            }
+            
+            this.log(`✅ Analysis complete: ${analysisData.battleRating}, ${analysisData.fairFightChance} win chance`);
+            return analysisData;
+        }
+        
+        categorizeBattleStats(totalStats, level) {
+            // Advanced battle rating based on total stats and level
+            const statsPerLevel = totalStats / level;
+            
+            if (totalStats < 1000) return 'Minimal Threat';
+            else if (totalStats < 10000) return 'Low Threat';
+            else if (totalStats < 50000) return 'Moderate Threat';
+            else if (totalStats < 200000) return 'High Threat';
+            else if (totalStats < 1000000) return 'Elite Fighter';
+            else return 'Legendary';
+        }
+        
+        calculateFairFightChance(totalStats, level) {
+            // Fair fight calculation based on comparison with player level
+            // Assumes user is around mid-level for fair fight calculation
+            const myEstimatedStats = this.estimateStatsFromLevel(30); // Assume level 30 user
+            const ratio = myEstimatedStats / totalStats;
+            
+            let chance;
+            if (ratio > 1.5) chance = '~85%';
+            else if (ratio > 1.2) chance = '~70%';
+            else if (ratio > 0.8) chance = '~55%';
+            else if (ratio > 0.5) chance = '~40%';
+            else if (ratio > 0.3) chance = '~25%';
+            else chance = '~10%';
+            
+            return chance;
+        }
+        
+        estimateStatsFromLevel(level) {
+            // Advanced level-based stat estimation
+            // Based on typical progression patterns
+            if (level < 10) return level * 100;
+            else if (level < 20) return Math.pow(level, 1.8) * 50;
+            else if (level < 30) return Math.pow(level, 2.1) * 30;
+            else if (level < 50) return Math.pow(level, 2.3) * 20;
+            else return Math.pow(level, 2.5) * 15;
+        }
+        
+        determineActivityStatus(intelligence) {
+            if (!intelligence || !intelligence.lastAction) return 'Activity Unknown';
+            
+            const lastAction = intelligence.lastAction.toLowerCase();
+            if (lastAction.includes('online')) return 'Currently Online';
+            else if (lastAction.includes('minute')) return 'Recently Active';
+            else if (lastAction.includes('hour')) return 'Active Today';
+            else if (lastAction.includes('day')) return 'Active This Week';
+            else return 'Inactive';
+        }
+        
         extractPlayerInfo() {
-            // Extract player information from the page
+            this.log('🔍 Starting comprehensive battle stats scraping...');
+            
+            // Basic player identification
             const playerId = window.location.href.match(/XID=(d+)/)?.[1] || 
-                           document.querySelector('[href*="XID="]')?.href.match(/XID=(d+)/)?.[1];
+                           document.querySelector('[href*="XID="]')?.href.match(/XID=(d+)/)?.[1] ||
+                           document.querySelector('input[name="XID"]')?.value;
             
-            const playerName = document.querySelector('.username, .player-name, h4')?.textContent?.trim();
-            const level = document.querySelector('.level, [class*="level"]')?.textContent?.match(/d+/)?.[0];
+            const playerName = document.querySelector('.username, .player-name, h4, .profile-wrapper h4, [class*="name"], .honor-text')?.textContent?.trim() ||
+                              document.title?.match(/([^-]+) -/)?.[1]?.trim();
             
-            return {
-                playerId,
-                playerName,
-                level: level ? parseInt(level) : null
+            const levelText = document.querySelector('.level, [class*="level"], .profile-wrapper .level, .honor-text')?.textContent;
+            const level = levelText?.match(/(d+)/)?.[1] ? parseInt(levelText.match(/(d+)/)[1]) : null;
+            
+            // BATTLE STATS SCRAPING - Core functionality
+            const battleStats = this.scrapeBattleStats();
+            
+            // Additional profile intelligence
+            const profileIntelligence = this.scrapeProfileIntelligence();
+            
+            // Faction intelligence
+            const factionData = this.scrapeFactionData();
+            
+            const playerData = {
+                playerId: playerId || 'unknown',
+                playerName: playerName || 'Player',
+                level: level || 1,
+                battleStats,
+                profileIntelligence,
+                factionData,
+                scrapedAt: new Date().toISOString()
             };
+            
+            this.log(`✅ Player data extracted: ${playerName} [Level ${level}] - Battle Stats: ${battleStats.found ? 'Found' : 'Estimated'}`);
+            return playerData;
+        }
+        
+        scrapeBattleStats() {
+            this.log('⚔️ Scraping battle statistics...');
+            
+            // Try multiple methods to find battle stats
+            const battleStats = {
+                strength: null,
+                defense: null, 
+                speed: null,
+                dexterity: null,
+                total: null,
+                found: false,
+                method: 'none'
+            };
+            
+            // Method 1: Direct stat scraping from profile page
+            const statElements = document.querySelectorAll('td, div, span');
+            const statKeywords = {
+                strength: ['strength', 'str', 'power'],
+                defense: ['defense', 'def', 'defence', 'defensive'],
+                speed: ['speed', 'spd', 'agility'],
+                dexterity: ['dexterity', 'dex', 'accuracy']
+            };
+            
+            statElements.forEach(element => {
+                const text = element.textContent?.toLowerCase().trim();
+                const parentText = element.parentElement?.textContent?.toLowerCase();
+                const siblingText = element.previousElementSibling?.textContent?.toLowerCase();
+                
+                // Look for stat patterns
+                Object.keys(statKeywords).forEach(statType => {
+                    statKeywords[statType].forEach(keyword => {
+                        if ((text?.includes(keyword) || parentText?.includes(keyword) || siblingText?.includes(keyword)) && !battleStats[statType]) {
+                            const numericValue = element.textContent?.match(/[d,]+/)?.[0]?.replace(/,/g, '');
+                            if (numericValue && parseInt(numericValue) > 0) {
+                                battleStats[statType] = parseInt(numericValue);
+                                battleStats.found = true;
+                                battleStats.method = 'direct-scraping';
+                                this.log(`📊 Found ${statType}: ${battleStats[statType]}`);
+                            }
+                        }
+                    });
+                });
+            });
+            
+            // Method 2: Battle stats from API data if available
+            if (!battleStats.found) {
+                const scriptTags = document.querySelectorAll('script');
+                scriptTags.forEach(script => {
+                    const content = script.textContent || '';
+                    
+                    // Look for API data in script tags
+                    if (content.includes('strength') && content.includes('defense')) {
+                        try {
+                            const matches = content.match(/"strength":(d+),"defense":(d+),"speed":(d+),"dexterity":(d+)/);
+                            if (matches) {
+                                battleStats.strength = parseInt(matches[1]);
+                                battleStats.defense = parseInt(matches[2]);
+                                battleStats.speed = parseInt(matches[3]);
+                                battleStats.dexterity = parseInt(matches[4]);
+                                battleStats.found = true;
+                                battleStats.method = 'api-data';
+                                this.log('📊 Extracted battle stats from API data');
+                            }
+                        } catch (e) {
+                            this.log('⚠️ Failed to parse API data');
+                        }
+                    }
+                });
+            }
+            
+            // Method 3: Hidden form data or page data
+            if (!battleStats.found) {
+                const hiddenInputs = document.querySelectorAll('input[type="hidden"]');
+                hiddenInputs.forEach(input => {
+                    const name = input.name?.toLowerCase();
+                    const value = input.value;
+                    
+                    if (name && value && Object.keys(statKeywords).some(stat => statKeywords[stat].includes(name))) {
+                        const numericValue = parseInt(value);
+                        if (numericValue > 0) {
+                            Object.keys(statKeywords).forEach(statType => {
+                                if (statKeywords[statType].includes(name) && !battleStats[statType]) {
+                                    battleStats[statType] = numericValue;
+                                    battleStats.found = true;
+                                    battleStats.method = 'hidden-data';
+                                }
+                            });
+                        }
+                    }
+                });
+            }
+            
+            // Calculate total if we have individual stats
+            if (battleStats.strength && battleStats.defense && battleStats.speed && battleStats.dexterity) {
+                battleStats.total = battleStats.strength + battleStats.defense + battleStats.speed + battleStats.dexterity;
+            }
+            
+            return battleStats;
+        }
+        
+        scrapeProfileIntelligence() {
+            // Extract additional intelligence data
+            const intelligence = {
+                lastAction: null,
+                status: null,
+                networth: null,
+                criminalRecord: null,
+                awards: [],
+                properties: null
+            };
+            
+            // Last action scraping
+            const actionElements = document.querySelectorAll('.last-action, [class*="last"], .status, [class*="status"]');
+            actionElements.forEach(element => {
+                const text = element.textContent?.trim();
+                if (text && (text.includes('ago') || text.includes('Online') || text.includes('Offline'))) {
+                    intelligence.lastAction = text;
+                }
+            });
+            
+            // Networth scraping
+            const netElements = document.querySelectorAll('td, div, span');
+            netElements.forEach(element => {
+                const text = element.textContent?.toLowerCase();
+                if (text?.includes('networth') || text?.includes('net worth')) {
+                    const value = text.match(/$?[d,]+/)?.[0]?.replace(/[$,]/g, '');
+                    if (value) {
+                        intelligence.networth = parseInt(value);
+                    }
+                }
+            });
+            
+            return intelligence;
+        }
+        
+        scrapeFactionData() {
+            const factionData = {
+                name: null,
+                id: null,
+                position: null,
+                respect: null
+            };
+            
+            const factionLink = document.querySelector('[href*="factions.php"], [href*="faction"]');
+            if (factionLink) {
+                factionData.name = factionLink.textContent?.trim();
+                factionData.id = factionLink.href?.match(/ID=(d+)/)?.[1];
+            }
+            
+            // Look for faction position
+            const posElements = document.querySelectorAll('td, div, span');
+            posElements.forEach(element => {
+                const text = element.textContent?.toLowerCase();
+                if (text?.includes('position') || text?.includes('rank')) {
+                    const nextElement = element.nextElementSibling;
+                    if (nextElement) {
+                        factionData.position = nextElement.textContent?.trim();
+                    }
+                }
+            });
+            
+            return factionData;
         }
         
         enhanceProfileDisplay() {
