@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BOS
 // @namespace    Brother Owl's Skyview
-// @version      3.2.4
+// @version      3.2.6
 // @author       Homiewrecker
 // @description  Advanced battle intelligence and stat estimation for Torn PDA
 // @icon         🦉
@@ -59,7 +59,7 @@
         }
         
         async init() {
-            this.log('🦉 Brother Owl Skyview v3.2.4 - Initializing...');
+            this.log('🦉 Brother Owl Skyview v3.2.6 - Initializing...');
             this.addStyles();
             this.setupUI();
             
@@ -182,7 +182,7 @@
                         data: JSON.stringify({
                             action: 'verify-api-key',
                             apiKey: this.apiKey,
-                            userscriptVersion: '3.2.4'
+                            userscriptVersion: '3.2.6'
                         })
                     });
                     
@@ -424,80 +424,156 @@
         }
         
         generateBattleStatsEstimate(playerInfo) {
-            this.log('🧮 Generating battle stats estimates...');
+            this.log('🧮 Advanced battle analysis initiated...');
             
-            const level = playerInfo.level || 1;
             const battleStats = playerInfo.battleStats;
+            const profileIntel = playerInfo.profileIntelligence;
+            const factionData = playerInfo.factionData;
             
             let analysisData = {};
             
             // If we have actual battle stats, analyze them
-            if (battleStats.found) {
+            if (battleStats.found && battleStats.confidence > 70) {
                 const total = battleStats.total || (battleStats.strength + battleStats.defense + battleStats.speed + battleStats.dexterity);
                 
                 analysisData = {
-                    battleRating: this.categorizeBattleStats(total, level),
-                    fairFightChance: this.calculateFairFightChance(total, level),
-                    activityStatus: this.determineActivityStatus(playerInfo.profileIntelligence),
+                    battleRating: this.categorizeBattleStats(total),
+                    fairFightChance: this.calculateFairFightChance(total),
+                    activityStatus: this.determineActivityStatus(profileIntel),
                     statsFound: true,
                     totalStats: total ? total.toLocaleString() : 'Calculating...',
-                    breakdown: `STR: ${battleStats.strength || '?'} | DEF: ${battleStats.defense || '?'} | SPD: ${battleStats.speed || '?'} | DEX: ${battleStats.dexterity || '?'}`
+                    breakdown: `STR: ${battleStats.strength?.toLocaleString() || '?'} | DEF: ${battleStats.defense?.toLocaleString() || '?'} | SPD: ${battleStats.speed?.toLocaleString() || '?'} | DEX: ${battleStats.dexterity?.toLocaleString() || '?'}`,
+                    confidence: `${battleStats.confidence}% confidence`
                 };
             } else {
-                // Provide level-based estimates when stats aren't found
-                const estimatedTotal = this.estimateStatsFromLevel(level);
+                // Advanced intelligence-based estimation using profile data
+                const intelligenceEstimate = this.performIntelligenceBasedEstimation(playerInfo);
                 
                 analysisData = {
-                    battleRating: this.categorizeBattleStats(estimatedTotal, level),
-                    fairFightChance: this.calculateFairFightChance(estimatedTotal, level),
-                    activityStatus: this.determineActivityStatus(playerInfo.profileIntelligence),
+                    battleRating: intelligenceEstimate.threatLevel,
+                    fairFightChance: intelligenceEstimate.winChance,
+                    activityStatus: this.determineActivityStatus(profileIntel),
                     statsFound: false,
-                    totalStats: `~${estimatedTotal.toLocaleString()} (Est.)`,
-                    breakdown: 'Stats private - using level-based estimation'
+                    totalStats: intelligenceEstimate.estimatedRange,
+                    breakdown: intelligenceEstimate.analysisMethod,
+                    confidence: 'Intelligence-based analysis'
                 };
             }
             
-            this.log(`✅ Analysis complete: ${analysisData.battleRating}, ${analysisData.fairFightChance} win chance`);
+            this.log(`✅ Analysis complete: ${analysisData.battleRating}, confidence: ${analysisData.confidence}`);
             return analysisData;
         }
         
-        categorizeBattleStats(totalStats, level) {
-            // Advanced battle rating based on total stats and level
-            const statsPerLevel = totalStats / level;
+        performIntelligenceBasedEstimation(playerInfo) {
+            this.log('🕵️ Performing intelligence-based threat assessment...');
             
-            if (totalStats < 1000) return 'Minimal Threat';
-            else if (totalStats < 10000) return 'Low Threat';
-            else if (totalStats < 50000) return 'Moderate Threat';
-            else if (totalStats < 200000) return 'High Threat';
-            else if (totalStats < 1000000) return 'Elite Fighter';
-            else return 'Legendary';
+            const level = playerInfo.level || 1;
+            const factionData = playerInfo.factionData;
+            const profileIntel = playerInfo.profileIntelligence;
+            
+            // Faction-based intelligence
+            let factionThreatMultiplier = 1.0;
+            if (factionData.name) {
+                // High-threat factions (examples based on game knowledge)
+                const highThreatFactions = ['Umbrella', 'Ascension', 'Subversive Alliance', 'The Firm'];
+                const mediumThreatFactions = ['Grand Code']; // User's own faction
+                
+                if (highThreatFactions.some(f => factionData.name.includes(f))) {
+                    factionThreatMultiplier = 2.5;
+                } else if (mediumThreatFactions.some(f => factionData.name.includes(f))) {
+                    factionThreatMultiplier = 1.8;
+                }
+            }
+            
+            // Position-based threat assessment
+            let positionThreatMultiplier = 1.0;
+            if (factionData.position) {
+                const position = factionData.position.toLowerCase();
+                if (position.includes('leader') || position.includes('co-leader')) {
+                    positionThreatMultiplier = 2.0;
+                } else if (position.includes('officer') || position.includes('sergeant')) {
+                    positionThreatMultiplier = 1.5;
+                }
+            }
+            
+            // Activity-based threat assessment
+            let activityMultiplier = 1.0;
+            if (profileIntel.lastAction) {
+                const lastAction = profileIntel.lastAction.toLowerCase();
+                if (lastAction.includes('online') || lastAction.includes('minute')) {
+                    activityMultiplier = 1.3; // Active players tend to have better stats
+                }
+            }
+            
+            // Networth-based intelligence (if available)
+            let networthMultiplier = 1.0;
+            if (profileIntel.networth && profileIntel.networth > 0) {
+                if (profileIntel.networth > 1000000000) networthMultiplier = 2.0; // Billionaire
+                else if (profileIntel.networth > 100000000) networthMultiplier = 1.7; // 100M+
+                else if (profileIntel.networth > 10000000) networthMultiplier = 1.3; // 10M+
+            }
+            
+            // Base threat calculation using multiple intelligence factors
+            const baseThreat = level * 1000; // Very conservative base
+            const adjustedThreat = baseThreat * factionThreatMultiplier * positionThreatMultiplier * activityMultiplier * networthMultiplier;
+            
+            // Categorize threat level
+            let threatLevel;
+            if (adjustedThreat < 50000) threatLevel = 'Low Threat';
+            else if (adjustedThreat < 200000) threatLevel = 'Moderate Threat';
+            else if (adjustedThreat < 500000) threatLevel = 'High Threat';
+            else if (adjustedThreat < 1000000) threatLevel = 'Elite Fighter';
+            else threatLevel = 'Legendary';
+            
+            // Win chance based on intelligence
+            let winChance;
+            if (adjustedThreat < 100000) winChance = '~75%';
+            else if (adjustedThreat < 300000) winChance = '~60%';
+            else if (adjustedThreat < 600000) winChance = '~45%';
+            else if (adjustedThreat < 1000000) winChance = '~30%';
+            else winChance = '~15%';
+            
+            const analysisFactors = [];
+            if (factionThreatMultiplier > 1.0) analysisFactors.push('Faction');
+            if (positionThreatMultiplier > 1.0) analysisFactors.push('Position');
+            if (activityMultiplier > 1.0) analysisFactors.push('Activity');
+            if (networthMultiplier > 1.0) analysisFactors.push('Wealth');
+            
+            return {
+                threatLevel,
+                winChance,
+                estimatedRange: `${Math.floor(adjustedThreat * 0.8).toLocaleString()} - ${Math.floor(adjustedThreat * 1.2).toLocaleString()}`,
+                analysisMethod: `Intelligence factors: ${analysisFactors.join(', ') || 'Basic profile'}`
+            };
         }
         
-        calculateFairFightChance(totalStats, level) {
-            // Fair fight calculation based on comparison with player level
-            // Assumes user is around mid-level for fair fight calculation
-            const myEstimatedStats = this.estimateStatsFromLevel(30); // Assume level 30 user
-            const ratio = myEstimatedStats / totalStats;
+        categorizeBattleStats(totalStats) {
+            // Pure battle stats based categorization - no level dependency
+            if (totalStats < 10000) return 'Minimal Threat';
+            else if (totalStats < 50000) return 'Low Threat';
+            else if (totalStats < 200000) return 'Moderate Threat';
+            else if (totalStats < 500000) return 'High Threat';
+            else if (totalStats < 1000000) return 'Elite Fighter';
+            else if (totalStats < 5000000) return 'Legendary';
+            else return 'Mythical';
+        }
+        
+        calculateFairFightChance(totalStats) {
+            // Fair fight calculation based on realistic stat comparison
+            // Assume average active player has around 250k total stats
+            const averagePlayerStats = 250000;
+            const ratio = averagePlayerStats / totalStats;
             
             let chance;
-            if (ratio > 1.5) chance = '~85%';
-            else if (ratio > 1.2) chance = '~70%';
-            else if (ratio > 0.8) chance = '~55%';
-            else if (ratio > 0.5) chance = '~40%';
-            else if (ratio > 0.3) chance = '~25%';
+            if (ratio > 2.0) chance = '~90%';
+            else if (ratio > 1.5) chance = '~75%';
+            else if (ratio > 1.2) chance = '~65%';
+            else if (ratio > 0.8) chance = '~50%';
+            else if (ratio > 0.5) chance = '~35%';
+            else if (ratio > 0.3) chance = '~20%';
             else chance = '~10%';
             
             return chance;
-        }
-        
-        estimateStatsFromLevel(level) {
-            // Advanced level-based stat estimation
-            // Based on typical progression patterns
-            if (level < 10) return level * 100;
-            else if (level < 20) return Math.pow(level, 1.8) * 50;
-            else if (level < 30) return Math.pow(level, 2.1) * 30;
-            else if (level < 50) return Math.pow(level, 2.3) * 20;
-            else return Math.pow(level, 2.5) * 15;
         }
         
         determineActivityStatus(intelligence) {
@@ -549,9 +625,8 @@
         }
         
         scrapeBattleStats() {
-            this.log('⚔️ Scraping battle statistics...');
+            this.log('⚔️ Comprehensive battle stats extraction initiated...');
             
-            // Try multiple methods to find battle stats
             const battleStats = {
                 strength: null,
                 defense: null, 
@@ -559,90 +634,177 @@
                 dexterity: null,
                 total: null,
                 found: false,
-                method: 'none'
+                method: 'none',
+                confidence: 0
             };
             
-            // Method 1: Direct stat scraping from profile page
-            const statElements = document.querySelectorAll('td, div, span');
-            const statKeywords = {
-                strength: ['strength', 'str', 'power'],
-                defense: ['defense', 'def', 'defence', 'defensive'],
-                speed: ['speed', 'spd', 'agility'],
-                dexterity: ['dexterity', 'dex', 'accuracy']
+            // Method 1: Aggressive DOM scraping - ALL elements
+            this.log('🔍 Method 1: Aggressive DOM scraping');
+            const allElements = document.querySelectorAll('*');
+            const statPatterns = {
+                strength: /str(?:ength)?[:=s]*(d{1,3}(?:,d{3})*)/i,
+                defense: /def(?:en[cs]e)?[:=s]*(d{1,3}(?:,d{3})*)/i,
+                speed: /sp(?:eed|d)[:=s]*(d{1,3}(?:,d{3})*)/i,
+                dexterity: /dex(?:terity)?[:=s]*(d{1,3}(?:,d{3})*)/i
             };
             
-            statElements.forEach(element => {
-                const text = element.textContent?.toLowerCase().trim();
-                const parentText = element.parentElement?.textContent?.toLowerCase();
-                const siblingText = element.previousElementSibling?.textContent?.toLowerCase();
+            allElements.forEach(element => {
+                const text = element.textContent || element.innerText || '';
+                const attributes = Array.from(element.attributes || []).map(a => `${a.name}="${a.value}"`).join(' ');
+                const fullText = text + ' ' + attributes;
                 
-                // Look for stat patterns
-                Object.keys(statKeywords).forEach(statType => {
-                    statKeywords[statType].forEach(keyword => {
-                        if ((text?.includes(keyword) || parentText?.includes(keyword) || siblingText?.includes(keyword)) && !battleStats[statType]) {
-                            const numericValue = element.textContent?.match(/[d,]+/)?.[0]?.replace(/,/g, '');
-                            if (numericValue && parseInt(numericValue) > 0) {
-                                battleStats[statType] = parseInt(numericValue);
+                Object.entries(statPatterns).forEach(([statType, pattern]) => {
+                    if (!battleStats[statType]) {
+                        const match = fullText.match(pattern);
+                        if (match && match[1]) {
+                            const value = parseInt(match[1].replace(/,/g, ''));
+                            if (value > 0 && value < 10000000) { // Reasonable bounds
+                                battleStats[statType] = value;
                                 battleStats.found = true;
-                                battleStats.method = 'direct-scraping';
-                                this.log(`📊 Found ${statType}: ${battleStats[statType]}`);
+                                battleStats.method = 'dom-pattern-match';
+                                battleStats.confidence = Math.max(battleStats.confidence, 85);
+                                this.log(`✅ Found ${statType}: ${value} via DOM pattern`);
+                            }
+                        }
+                    }
+                });
+            });
+            
+            // Method 2: JavaScript variable extraction
+            if (!battleStats.found || battleStats.confidence < 90) {
+                this.log('🔍 Method 2: JavaScript variable extraction');
+                const scripts = document.querySelectorAll('script');
+                scripts.forEach(script => {
+                    const content = script.textContent || '';
+                    
+                    // Look for common JS variable patterns
+                    const jsPatterns = [
+                        /"stats":s*{[^}]*"strength":s*(d+)[^}]*"defense":s*(d+)[^}]*"speed":s*(d+)[^}]*"dexterity":s*(d+)/,
+                        /battleStatss*[:=]s*{s*str:s*(d+),s*def:s*(d+),s*spd:s*(d+),s*dex:s*(d+)/,
+                        /player.statss*=s*{s*strength:s*(d+),s*defense:s*(d+),s*speed:s*(d+),s*dexterity:s*(d+)/,
+                        /vars+statss*=s*[(d+),s*(d+),s*(d+),s*(d+)]/
+                    ];
+                    
+                    jsPatterns.forEach((pattern, index) => {
+                        const match = content.match(pattern);
+                        if (match && !battleStats.found) {
+                            battleStats.strength = parseInt(match[1]);
+                            battleStats.defense = parseInt(match[2]);
+                            battleStats.speed = parseInt(match[3]);
+                            battleStats.dexterity = parseInt(match[4]);
+                            battleStats.found = true;
+                            battleStats.method = `js-pattern-${index + 1}`;
+                            battleStats.confidence = 95;
+                            this.log('🎯 Extracted stats from JavaScript variables');
+                        }
+                    });
+                });
+            }
+            
+            // Method 3: Network request interception (if available)
+            if (!battleStats.found && window.fetch) {
+                this.log('🔍 Method 3: Attempting network data interception');
+                try {
+                    // Look for cached API responses in browser
+                    const performance = window.performance;
+                    if (performance && performance.getEntries) {
+                        const entries = performance.getEntries();
+                        entries.forEach(entry => {
+                            if (entry.name && (entry.name.includes('api') || entry.name.includes('torn'))) {
+                                this.log(`📡 Found API call: ${entry.name}`);
+                                // Note: We can't access response data directly due to CORS, but we can note the presence
+                            }
+                        });
+                    }
+                } catch (e) {
+                    this.log('⚠️ Network interception not available');
+                }
+            }
+            
+            // Method 4: CSS computed values and styling clues
+            if (!battleStats.found) {
+                this.log('🔍 Method 4: CSS and styling analysis');
+                const elementsWithNumbers = document.querySelectorAll('[data-stat], [data-value], .stat-value, .battle-stat');
+                elementsWithNumbers.forEach(element => {
+                    const dataAttrs = ['data-stat', 'data-value', 'data-strength', 'data-defense', 'data-speed', 'data-dexterity'];
+                    dataAttrs.forEach(attr => {
+                        const value = element.getAttribute(attr);
+                        if (value && /^d+$/.test(value)) {
+                            const num = parseInt(value);
+                            if (num > 1000) { // Likely a battle stat
+                                const attrLower = attr.toLowerCase();
+                                if (attrLower.includes('str') && !battleStats.strength) battleStats.strength = num;
+                                else if (attrLower.includes('def') && !battleStats.defense) battleStats.defense = num;
+                                else if (attrLower.includes('spd') || attrLower.includes('speed')) battleStats.speed = num;
+                                else if (attrLower.includes('dex') && !battleStats.dexterity) battleStats.dexterity = num;
+                                
+                                if (num > 0) {
+                                    battleStats.found = true;
+                                    battleStats.method = 'css-data-attributes';
+                                    battleStats.confidence = 80;
+                                }
                             }
                         }
                     });
                 });
-            });
-            
-            // Method 2: Battle stats from API data if available
-            if (!battleStats.found) {
-                const scriptTags = document.querySelectorAll('script');
-                scriptTags.forEach(script => {
-                    const content = script.textContent || '';
-                    
-                    // Look for API data in script tags
-                    if (content.includes('strength') && content.includes('defense')) {
-                        try {
-                            const matches = content.match(/"strength":(d+),"defense":(d+),"speed":(d+),"dexterity":(d+)/);
-                            if (matches) {
-                                battleStats.strength = parseInt(matches[1]);
-                                battleStats.defense = parseInt(matches[2]);
-                                battleStats.speed = parseInt(matches[3]);
-                                battleStats.dexterity = parseInt(matches[4]);
-                                battleStats.found = true;
-                                battleStats.method = 'api-data';
-                                this.log('📊 Extracted battle stats from API data');
-                            }
-                        } catch (e) {
-                            this.log('⚠️ Failed to parse API data');
-                        }
-                    }
-                });
             }
             
-            // Method 3: Hidden form data or page data
+            // Method 5: Deep pattern analysis of all text nodes
             if (!battleStats.found) {
-                const hiddenInputs = document.querySelectorAll('input[type="hidden"]');
-                hiddenInputs.forEach(input => {
-                    const name = input.name?.toLowerCase();
-                    const value = input.value;
-                    
-                    if (name && value && Object.keys(statKeywords).some(stat => statKeywords[stat].includes(name))) {
-                        const numericValue = parseInt(value);
-                        if (numericValue > 0) {
-                            Object.keys(statKeywords).forEach(statType => {
-                                if (statKeywords[statType].includes(name) && !battleStats[statType]) {
-                                    battleStats[statType] = numericValue;
-                                    battleStats.found = true;
-                                    battleStats.method = 'hidden-data';
+                this.log('🔍 Method 5: Deep text pattern analysis');
+                const walker = document.createTreeWalker(
+                    document.body,
+                    NodeFilter.SHOW_TEXT,
+                    null,
+                    false
+                );
+                
+                let node;
+                while (node = walker.nextNode()) {
+                    const text = node.textContent.trim();
+                    if (text.length > 3 && /d/.test(text)) {
+                        // Look for stat-like patterns in raw text
+                        const patterns = [
+                            /(d{1,3}(?:,d{3})*)s*(?:str|strength)/i,
+                            /(?:str|strength)[:=s]*(d{1,3}(?:,d{3})*)/i,
+                            /(d{1,3}(?:,d{3})*)s*(?:def|defense|defence)/i,
+                            /(?:def|defense|defence)[:=s]*(d{1,3}(?:,d{3})*)/i,
+                            /(d{1,3}(?:,d{3})*)s*(?:spd|speed)/i,
+                            /(?:spd|speed)[:=s]*(d{1,3}(?:,d{3})*)/i,
+                            /(d{1,3}(?:,d{3})*)s*(?:dex|dexterity)/i,
+                            /(?:dex|dexterity)[:=s]*(d{1,3}(?:,d{3})*)/i
+                        ];
+                        
+                        patterns.forEach((pattern, index) => {
+                            const match = text.match(pattern);
+                            if (match && match[1]) {
+                                const value = parseInt(match[1].replace(/,/g, ''));
+                                if (value > 100 && value < 10000000) {
+                                    const statType = ['strength', 'strength', 'defense', 'defense', 'speed', 'speed', 'dexterity', 'dexterity'][index];
+                                    if (!battleStats[statType]) {
+                                        battleStats[statType] = value;
+                                        battleStats.found = true;
+                                        battleStats.method = 'deep-text-analysis';
+                                        battleStats.confidence = 75;
+                                        this.log(`🔍 Deep scan found ${statType}: ${value}`);
+                                    }
                                 }
-                            });
-                        }
+                            }
+                        });
                     }
-                });
+                }
             }
             
             // Calculate total if we have individual stats
             if (battleStats.strength && battleStats.defense && battleStats.speed && battleStats.dexterity) {
                 battleStats.total = battleStats.strength + battleStats.defense + battleStats.speed + battleStats.dexterity;
+                battleStats.confidence = Math.max(battleStats.confidence, 90);
+            }
+            
+            if (battleStats.found) {
+                this.log(`✅ Battle stats extracted via ${battleStats.method} (confidence: ${battleStats.confidence}%)`);
+            } else {
+                this.log('❌ No battle stats found through scraping - stats may be completely private');
             }
             
             return battleStats;
