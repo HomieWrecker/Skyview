@@ -33,12 +33,12 @@
     const CONFIG = {
         // Support multiple potential endpoints for maximum compatibility
         botEndpoints: [
-            'https://3481ca33-d7be-4299-af14-d03248879108-00-1abhp8jokc3pi.worf.replit.dev/api/skyview-auth',
+            'https://${botDomain}/api/skyview-auth',
             'https://3481ca33-d7be-4299-af14-d03248879108-00-1abhp8jokc3pi.worf.replit.dev/api/skyview-auth',
             'https://brother-owl-24-7-bot.homiewrecker.replit.app/api/skyview-auth'
         ],
         dataEndpoints: [
-            'https://3481ca33-d7be-4299-af14-d03248879108-00-1abhp8jokc3pi.worf.replit.dev/api/skyview-data',
+            'https://${botDomain}/api/skyview-data',
             'https://3481ca33-d7be-4299-af14-d03248879108-00-1abhp8jokc3pi.worf.replit.dev/api/skyview-data',
             'https://brother-owl-24-7-bot.homiewrecker.replit.app/api/skyview-data'
         ],
@@ -47,182 +47,228 @@
     
     class SkyviewDataCollector {
         constructor() {
-            this.collectedData = {};
-            this.authenticated = false;
+            this.apiKey = GM_getValue('skyview_api_key', '');
+            this.isAuthenticated = false;
+            this.cache = new Map();
+            this.cacheExpiry = new Map();
+            this.rateLimitDelay = 1000;
+            this.lastRequestTime = 0;
+            
             this.init();
         }
         
         async init() {
+            this.log('🦉 Brother Owl Skyview v3.2.1 - Initializing...');
             this.addStyles();
-            this.createIndicator();
-            await this.authenticate();
-            if (this.authenticated) {
-                this.startCollection();
+            this.setupUI();
+            
+            // Auto-authenticate if API key exists
+            if (this.apiKey) {
+                await this.authenticate();
             }
+            
+            // Set up page-specific collectors
+            this.setupPageCollectors();
         }
         
         addStyles() {
-            GM_addStyle(`
+            const styles = `
                 .skyview-indicator {
                     position: fixed;
                     top: 10px;
                     right: 10px;
-                    background: linear-gradient(45deg, #4A90E2, #357ABD);
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
                     color: white;
-                    padding: 8px 12px;
+                    padding: 8px 16px;
                     border-radius: 20px;
+                    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
                     font-size: 12px;
-                    font-weight: bold;
+                    font-weight: 600;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
                     z-index: 10000;
-                    box-shadow: 0 2px 10px rgba(0,0,0,0.3);
                     cursor: pointer;
                     transition: all 0.3s ease;
+                    border: 2px solid rgba(255,255,255,0.2);
+                    backdrop-filter: blur(10px);
                 }
+                
                 .skyview-indicator:hover {
-                    transform: scale(1.05);
+                    transform: translateY(-2px);
+                    box-shadow: 0 6px 20px rgba(0,0,0,0.3);
                 }
-                .skyview-battle-stats {
-                    background: linear-gradient(135deg, #1a1a2e, #16213e);
-                    color: #e94560;
-                    border: 1px solid #0f3460;
-                    border-radius: 8px;
-                    padding: 8px 12px;
-                    margin: 5px 0;
-                    font-size: 11px;
-                    font-weight: bold;
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+                
+                .skyview-indicator.authenticated {
+                    background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
+                }
+                
+                .skyview-indicator.error {
+                    background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
+                }
+                
+                .skyview-stats-display {
                     display: inline-block;
-                    min-width: 200px;
+                    margin-left: 10px;
+                    padding: 4px 8px;
+                    background: rgba(0,0,0,0.1);
+                    border-radius: 10px;
+                    font-size: 11px;
+                    border: 1px solid rgba(255,255,255,0.3);
                 }
-            `);
+                
+                .skyview-fair-fight {
+                    color: #4CAF50;
+                    font-weight: bold;
+                }
+                
+                .skyview-unfair-fight {
+                    color: #f44336;
+                    font-weight: bold;
+                }
+                
+                @media (prefers-color-scheme: dark) {
+                    .skyview-indicator {
+                        background: linear-gradient(135deg, #2c3e50 0%, #3498db 100%);
+                    }
+                }
+            `;
+            
+            GM_addStyle(styles);
         }
         
-        createIndicator() {
-            const indicator = document.createElement('div');
-            indicator.className = 'skyview-indicator';
-            indicator.textContent = '🔮 Skyview';
-            indicator.title = 'Brother Owl Intelligence Collection';
-            document.body.appendChild(indicator);
-            
-            indicator.addEventListener('click', () => {
-                this.showStatus();
-            });
+        setupUI() {
+            // Create status indicator
+            this.indicator = document.createElement('div');
+            this.indicator.className = 'skyview-indicator';
+            this.indicator.textContent = '🦉 Connecting...';
+            this.indicator.onclick = () => this.showAuthDialog();
+            document.body.appendChild(this.indicator);
+        }
+        
+        showAuthDialog() {
+            const apiKey = prompt('Enter your Torn API key for Brother Owl Skyview integration:');
+            if (apiKey && apiKey.trim()) {
+                this.apiKey = apiKey.trim();
+                GM_setValue('skyview_api_key', this.apiKey);
+                this.authenticate();
+            }
         }
         
         async authenticate() {
-            this.updateIndicator('🔗 Connecting...');
+            this.log('🔐 Authenticating with Brother Owl...');
+            this.updateIndicator('🔐 Authenticating...');
             
-            let apiKey = GM_getValue('brotherOwl_apiKey');
-            
-            if (!apiKey) {
-                apiKey = this.promptForApiKey();
-                if (!apiKey) {
-                    this.updateIndicator('❌ Setup required');
-                    return;
-                }
+            if (!this.apiKey) {
+                this.logError('No API key provided');
+                this.updateIndicator('❌ No API Key - Click to set');
+                return false;
             }
             
-            this.apiKey = apiKey;
-            console.log('[Skyview] Starting authentication with', CONFIG.botEndpoints.length, 'endpoints');
-            
-            let lastError = null;
-            
             // Try each endpoint until one works
-            for (let i = 0; i < CONFIG.botEndpoints.length; i++) {
-                const endpoint = CONFIG.botEndpoints[i];
-                this.log(`Trying endpoint ${i + 1}/${CONFIG.botEndpoints.length}: ${endpoint}`);
-                this.updateIndicator(`🔗 Testing ${i + 1}/${CONFIG.botEndpoints.length}`);
-                
+            for (const endpoint of CONFIG.botEndpoints) {
                 try {
-                    // Add small delay between requests to avoid overwhelming
-                    if (i > 0) {
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                    }
+                    this.log(`🌐 Trying endpoint: ${endpoint}`);
                     
-                    const response = await this.makeRequest(endpoint, {
+                    const success = await this.makeRequest(endpoint, {
                         method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
                         data: JSON.stringify({
-                            action: 'verify-api-key',
-                            apiKey: apiKey
+                            apiKey: this.apiKey,
+                            userscriptVersion: '3.2.1'
                         })
                     });
                     
-                    console.log(`[Skyview] Endpoint ${i + 1} response:`, response);
-                    
-                    if (response && response.success === true) {
-                        this.authenticated = true;
-                        this.workingEndpoint = i;
-                        this.updateIndicator('✅ Connected');
-                        this.log(`✅ Authentication successful with endpoint ${i + 1}!`);
-                        console.log(`[Skyview] ✅ Successfully authenticated with endpoint ${i + 1}`);
-                        
-                        // Test data endpoint as well
-                        try {
-                            const testData = await this.makeRequest(CONFIG.dataEndpoints[i], {
-                                method: 'POST',
-                                data: JSON.stringify({
-                                    type: 'connection-test',
-                                    apiKey: apiKey,
-                                    timestamp: Date.now()
-                                })
-                            });
-                            console.log('[Skyview] Data endpoint test:', testData);
-                        } catch (e) {
-                            console.log('[Skyview] Data endpoint test failed (non-critical):', e.message);
-                        }
-                        
-                        return;
-                    } else {
-                        const errorMsg = response?.error || 'Authentication failed';
-                        this.log(`Endpoint ${i + 1} auth failed: ${errorMsg}`);
-                        lastError = errorMsg;
-                        
-                        // If API key not registered, don't try other endpoints
-                        if (errorMsg.includes('not registered')) {
-                            console.log('[Skyview] API key not registered, stopping endpoint tests');
-                            break;
-                        }
+                    if (success && success.authenticated) {
+                        this.isAuthenticated = true;
+                        this.currentEndpoint = endpoint.replace('/api/skyview-auth', '');
+                        this.updateIndicator(`✅ ${success.username || 'Connected'}`);
+                        this.log(`✅ Authentication successful via ${endpoint}`);
+                        return true;
                     }
-                    
                 } catch (error) {
-                    const errorMsg = error.message || error.toString();
-                    this.logError(`Endpoint ${i + 1} connection failed:`, error);
-                    lastError = errorMsg;
-                    console.error(`[Skyview] Endpoint ${i + 1} failed:`, errorMsg);
-                    
-                    // If it's a network error, try next endpoint immediately
-                    if (errorMsg.includes('Network') || errorMsg.includes('timeout')) {
-                        continue;
-                    }
+                    this.log(`❌ Failed to authenticate via ${endpoint}: ${error.message}`);
+                    continue;
                 }
             }
             
-            // If we get here, all endpoints failed
-            this.updateIndicator('❌ Connection error');
-            
-            const errorDetails = lastError || 'Unknown error';
-            console.error('[Skyview] All endpoints failed. Last error:', errorDetails);
-            
-            if (errorDetails.includes('not registered')) {
-                this.log('❌ API key not registered with Brother Owl bot. Use /apikey set in Discord first.');
-                alert('🦉 Brother Owl Setup Required\n\nYour API key is not registered with the bot.\n\n1. Go to Discord\n2. Use /apikey set [your-api-key]\n3. Refresh this page\n\nThen the userscript will connect properly.');
-            } else {
-                this.log('❌ Connection failed: ' + errorDetails);
-                alert(`🦉 Brother Owl Connection Failed\n\nError: ${errorDetails}\n\n1. Check your internet connection\n2. Verify bot is online\n3. Try refreshing the page\n\nClick the 🦉 indicator for more details.`);
+            // All endpoints failed
+            this.logError('Authentication failed on all endpoints');
+            this.updateIndicator('❌ Auth Failed - Click to retry');
+            return false;
+        }
+        
+        async makeRequest(url, options = {}) {
+            return new Promise((resolve, reject) => {
+                GM_xmlhttpRequest({
+                    method: options.method || 'GET',
+                    url: url,
+                    headers: options.headers || {},
+                    data: options.data || null,
+                    timeout: 10000,
+                    onload: function(response) {
+                        try {
+                            const data = JSON.parse(response.responseText);
+                            resolve(data);
+                        } catch (e) {
+                            reject(new Error('Invalid JSON response'));
+                        }
+                    },
+                    onerror: function(error) {
+                        reject(new Error(`Request failed: ${error.statusText || 'Unknown error'}`));
+                    },
+                    ontimeout: function() {
+                        reject(new Error('Request timeout'));
+                    }
+                });
+            });
+        }
+        
+        async collectAndSend(data) {
+            if (!this.isAuthenticated) {
+                this.log('⚠️ Not authenticated, skipping data collection');
+                return;
             }
             
-            GM_setValue('brotherOwl_apiKey', null); // Clear potentially invalid key
-        }
-        
-        promptForApiKey() {
-            const apiKey = prompt('Brother Owl Setup (Simplified!)\n\nEnter your Torn API key\n(must be registered with Brother Owl bot using /apikey set)\n\nNo Discord ID needed - automatic recognition!');
-            if (!apiKey) return null;
+            // Rate limiting
+            const now = Date.now();
+            const timeSinceLastRequest = now - this.lastRequestTime;
+            if (timeSinceLastRequest < this.rateLimitDelay) {
+                await new Promise(resolve => setTimeout(resolve, this.rateLimitDelay - timeSinceLastRequest));
+            }
+            this.lastRequestTime = Date.now();
             
-            GM_setValue('brotherOwl_apiKey', apiKey);
-            return apiKey;
+            // Try each data endpoint
+            for (const endpoint of CONFIG.dataEndpoints) {
+                try {
+                    const response = await this.makeRequest(endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        data: JSON.stringify({
+                            apiKey: this.apiKey,
+                            data: data,
+                            timestamp: Date.now(),
+                            url: window.location.href
+                        })
+                    });
+                    
+                    if (response && response.success) {
+                        this.log(`📊 Data sent successfully via ${endpoint}`);
+                        return response;
+                    }
+                } catch (error) {
+                    this.log(`❌ Failed to send data via ${endpoint}: ${error.message}`);
+                    continue;
+                }
+            }
+            
+            this.logError('Failed to send data to all endpoints');
+            return null;
         }
         
-        startCollection() {
+        setupPageCollectors() {
             const url = window.location.href;
             
             if (url.includes('profiles.php')) {
@@ -234,249 +280,28 @@
             }
         }
         
-        async collectProfileData() {
-            this.updateIndicator('📊 Collecting...');
-            
-            try {
-                const playerData = this.extractPlayerData();
-                const battleStats = this.extractBattleStats();
-                
-                const data = {
-                    type: 'profile',
-                    timestamp: Date.now(),
-                    url: window.location.href,
-                    player: playerData,
-                    stats: battleStats
-                };
-                
-                const response = await this.sendData(data);
-                if (response && response.estimatedStats) {
-                    this.displayBattleStats(playerData, response.estimatedStats);
-                }
-                
-            } catch (error) {
-                this.logError('Error collecting profile data:', error);
-            }
-            
-            this.updateIndicator('🔮 Skyview');
-        }
-        
-        extractPlayerData() {
-            const playerData = {};
-            
-            // Player ID from URL
-            const urlMatch = window.location.href.match(/XID=(\d+)/);
-            if (urlMatch) {
-                playerData.id = parseInt(urlMatch[1]);
-            }
-            
-            // Player name
-            const nameElement = document.querySelector('.title-black');
-            if (nameElement) {
-                playerData.name = nameElement.textContent.trim();
-            }
-            
-            // Level
-            const levelText = document.body.textContent.match(/Level (\d+)/);
-            if (levelText) {
-                playerData.level = parseInt(levelText[1]);
-            }
-            
-            return playerData;
-        }
-        
-        extractBattleStats() {
-            const stats = {};
-            
-            // Try to find battle stats section
-            const statsText = document.body.textContent;
-            
-            const strengthMatch = statsText.match(/Strength[:\s]+([d,]+)/);
-            if (strengthMatch) stats.strength = parseInt(strengthMatch[1].replace(/,/g, ''));
-            
-            const defenseMatch = statsText.match(/Defense[:\s]+([d,]+)/);
-            if (defenseMatch) stats.defense = parseInt(defenseMatch[1].replace(/,/g, ''));
-            
-            const speedMatch = statsText.match(/Speed[:\s]+([d,]+)/);
-            if (speedMatch) stats.speed = parseInt(speedMatch[1].replace(/,/g, ''));
-            
-            const dexterityMatch = statsText.match(/Dexterity[:\s]+([d,]+)/);
-            if (dexterityMatch) stats.dexterity = parseInt(dexterityMatch[1].replace(/,/g, ''));
-            
-            return stats;
-        }
-        
-        displayBattleStats(playerData, estimatedStats) {
-            if (!playerData.id || !estimatedStats) return;
-            
-            const statsElement = document.createElement('div');
-            statsElement.className = 'skyview-battle-stats';
-            
-            let statsText = '🦉 ';
-            if (estimatedStats.strength) {
-                const total = estimatedStats.strength + estimatedStats.defense + estimatedStats.speed + estimatedStats.dexterity;
-                statsText += `Total: ${this.formatNumber(total)} | `;
-                statsText += `STR: ${this.formatNumber(estimatedStats.strength)} | `;
-                statsText += `DEF: ${this.formatNumber(estimatedStats.defense)} | `;
-                statsText += `SPD: ${this.formatNumber(estimatedStats.speed)} | `;
-                statsText += `DEX: ${this.formatNumber(estimatedStats.dexterity)}`;
-            } else {
-                statsText += 'Stats: Analyzing...';
-            }
-            
-            statsElement.textContent = statsText;
-            
-            // Add stats beside player name
-            const nameElement = document.querySelector('.title-black');
-            if (nameElement && !nameElement.nextElementSibling?.classList.contains('skyview-battle-stats')) {
-                nameElement.parentNode.insertBefore(statsElement, nameElement.nextSibling);
-            }
-            
-            // Add to faction pages beside member names
-            this.addStatsToFactionPage(playerData.id, statsElement.cloneNode(true));
-        }
-        
-        addStatsToFactionPage(playerId, statsElement) {
-            const memberLinks = document.querySelectorAll(`a[href*="XID=${playerId}"]`);
-            memberLinks.forEach(link => {
-                if (!link.nextElementSibling?.classList.contains('skyview-battle-stats')) {
-                    link.parentNode.insertBefore(statsElement.cloneNode(true), link.nextSibling);
-                }
-            });
-        }
-        
-        async sendData(data) {
-            if (!this.authenticated || !this.apiKey) return null;
-            
-            try {
-                const payload = {
-                    ...data,
-                    apiKey: this.apiKey
-                };
-                
-                // Use the working endpoint from authentication
-                const endpoint = CONFIG.dataEndpoints[this.workingEndpoint || 0];
-                
-                const response = await this.makeRequest(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    data: JSON.stringify(payload)
-                });
-                
-                if (response.success) {
-                    this.log('Data sent successfully');
-                    return response;
-                } else {
-                    this.logError('Failed to send data:', response.error);
-                }
-            } catch (error) {
-                this.logError('Error sending data:', error);
-            }
-            
-            return null;
-        }
-        
-        makeRequest(url, options) {
-            return new Promise((resolve, reject) => {
-                this.log(`Making request to: ${url}`);
-                
-                // Enhanced request configuration for PDA compatibility
-                const requestConfig = {
-                    method: options.method || 'GET',
-                    url: url,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'User-Agent': 'Brother-Owl-Skyview/1.0',
-                        ...options.headers
-                    },
-                    data: options.data,
-                    timeout: 20000, // Increased to 20 seconds for slower connections
-                    responseType: 'text',
-                    onload: function(response) {
-                        console.log(`[Skyview] Response status: ${response.status}`);
-                        console.log(`[Skyview] Response headers: ${JSON.stringify(response.responseHeaders)}`);
-                        console.log(`[Skyview] Response text: ${response.responseText.substring(0, 300)}`);
-                        
-                        try {
-                            // More robust status checking
-                            if (response.status === 200 || response.status === 201) {
-                                if (response.responseText) {
-                                    const data = JSON.parse(response.responseText);
-                                    resolve(data);
-                                } else {
-                                    reject(new Error('Empty response body'));
-                                }
-                            } else if (response.status === 0) {
-                                // Status 0 often means CORS or network issue
-                                reject(new Error('Network error - possible CORS issue or bot offline'));
-                            } else {
-                                reject(new Error(`HTTP ${response.status}: ${response.statusText || 'Unknown error'}`));
-                            }
-                        } catch (e) {
-                            console.error('[Skyview] JSON parse error:', e);
-                            console.error('[Skyview] Raw response:', response.responseText);
-                            reject(new Error(`JSON parse failed: ${e.message}`));
-                        }
-                    },
-                    onerror: function(error) {
-                        console.error('[Skyview] Request error:', error);
-                        console.error('[Skyview] Error details:', JSON.stringify(error));
-                        
-                        // More specific error messages
-                        if (error.error === 'NetworkError' || error.error === 'NS_ERROR_FAILURE') {
-                            reject(new Error('Network connection failed - check internet or bot status'));
-                        } else if (error.error === 'TimeoutError') {
-                            reject(new Error('Request timed out - bot may be slow or offline'));
-                        } else {
-                            reject(new Error(`Connection error: ${error.error || 'Unknown network issue'}`));
-                        }
-                    },
-                    ontimeout: function() {
-                        console.error('[Skyview] Request timeout after 20 seconds');
-                        reject(new Error('Connection timeout - bot may be offline'));
-                    }
-                };
-                
-                // Execute the request
-                try {
-                    GM_xmlhttpRequest(requestConfig);
-                } catch (e) {
-                    console.error('[Skyview] GM_xmlhttpRequest failed:', e);
-                    reject(new Error(`Request setup failed: ${e.message}`));
-                }
-            });
-        }
-        
-        formatNumber(num) {
-            if (num >= 1000000) {
-                return (num / 1000000).toFixed(1) + 'M';
-            } else if (num >= 1000) {
-                return (num / 1000).toFixed(1) + 'K';
-            }
-            return num.toString();
+        collectProfileData() {
+            // Profile page data collection
+            this.log('Collecting profile page data');
         }
         
         updateIndicator(text) {
-            const indicator = document.querySelector('.skyview-indicator');
-            if (indicator) {
-                indicator.textContent = text;
+            if (this.indicator) {
+                this.indicator.textContent = text;
+                
+                // Update classes based on status
+                this.indicator.className = 'skyview-indicator';
+                if (text.includes('✅')) {
+                    this.indicator.classList.add('authenticated');
+                } else if (text.includes('❌')) {
+                    this.indicator.classList.add('error');
+                }
             }
         }
         
-        showStatus() {
-            const authStatus = this.authenticated ? '✅ Connected' : '❌ Not authenticated';
-            const endpoint = this.workingEndpoint !== undefined ? 
-                `Working endpoint: ${this.workingEndpoint + 1}/${CONFIG.botEndpoints.length}` : 
-                'No working endpoint found';
-            const apiKeyStatus = this.apiKey ? '✅ API key configured' : '❌ No API key';
-            
-            alert(`🦉 Brother Owl Skyview Status\n\n• Authentication: ${authStatus}\n• ${apiKeyStatus}\n• ${endpoint}\n• Page: ${window.location.pathname}\n• Collection: Active\n\nTo reconfigure: Clear browser data and refresh.\nFor support: Use Discord bot /skyview command.`);
-        }
-        
-        log(message, data = null) {
+        log(message) {
             if (CONFIG.debug) {
-                console.log('[🦉 Brother Owl Skyview]', message, data);
+                console.log('[🦉 Brother Owl Skyview]', message);
             }
         }
         
