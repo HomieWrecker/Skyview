@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BOS
 // @namespace    Brother Owl's Skyview
-// @version      3.2.6
+// @version      3.2.8
 // @author       Homiewrecker
 // @description  Advanced battle intelligence and stat estimation for Torn PDA
 // @icon         🦉
@@ -59,7 +59,7 @@
         }
         
         async init() {
-            this.log('🦉 Brother Owl Skyview v3.2.6 - Initializing...');
+            this.log('🦉 Brother Owl Skyview v3.2.8 - Initializing...');
             this.addStyles();
             this.setupUI();
             
@@ -182,7 +182,7 @@
                         data: JSON.stringify({
                             action: 'verify-api-key',
                             apiKey: this.apiKey,
-                            userscriptVersion: '3.2.6'
+                            userscriptVersion: '3.2.8'
                         })
                     });
                     
@@ -446,105 +446,210 @@
                     confidence: `${battleStats.confidence}% confidence`
                 };
             } else {
-                // Advanced intelligence-based estimation using profile data
-                const intelligenceEstimate = this.performIntelligenceBasedEstimation(playerInfo);
+                // Use PVP/battle-related data for estimation when stats can't be scraped
+                const battleDataEstimate = this.estimateFromBattleData(playerInfo);
                 
                 analysisData = {
-                    battleRating: intelligenceEstimate.threatLevel,
-                    fairFightChance: intelligenceEstimate.winChance,
+                    battleRating: battleDataEstimate.threatLevel,
+                    fairFightChance: battleDataEstimate.winChance,
                     activityStatus: this.determineActivityStatus(profileIntel),
                     statsFound: false,
-                    totalStats: intelligenceEstimate.estimatedRange,
-                    breakdown: intelligenceEstimate.analysisMethod,
-                    confidence: 'Intelligence-based analysis'
+                    totalStats: battleDataEstimate.estimatedRange,
+                    breakdown: battleDataEstimate.analysisMethod,
+                    confidence: battleDataEstimate.confidence
                 };
             }
             
             this.log(`✅ Analysis complete: ${analysisData.battleRating}, confidence: ${analysisData.confidence}`);
             return analysisData;
         }
-        
-        performIntelligenceBasedEstimation(playerInfo) {
-            this.log('🕵️ Performing intelligence-based threat assessment...');
+
+        estimateFromBattleData(playerInfo) {
+            this.log('⚔️ Estimating battle stats from PVP/battle data...');
             
             const level = playerInfo.level || 1;
-            const factionData = playerInfo.factionData;
             const profileIntel = playerInfo.profileIntelligence;
             
-            // Faction-based intelligence
-            let factionThreatMultiplier = 1.0;
-            if (factionData.name) {
-                // High-threat factions (examples based on game knowledge)
-                const highThreatFactions = ['Umbrella', 'Ascension', 'Subversive Alliance', 'The Firm'];
-                const mediumThreatFactions = ['Grand Code']; // User's own faction
-                
-                if (highThreatFactions.some(f => factionData.name.includes(f))) {
-                    factionThreatMultiplier = 2.5;
-                } else if (mediumThreatFactions.some(f => factionData.name.includes(f))) {
-                    factionThreatMultiplier = 1.8;
-                }
+            // Scrape for actual battle-related data from the profile
+            let battleDataPoints = [];
+            let estimatedTotal = 0;
+            let confidence = 'Battle data analysis';
+            
+            // Look for attack/defense wins/losses data
+            const attackData = this.scrapeBattlePerformanceData();
+            if (attackData.found) {
+                battleDataPoints.push('Attack Record');
+                // High win rate suggests strong stats
+                if (attackData.winRate > 0.8) estimatedTotal += 200000;
+                else if (attackData.winRate > 0.6) estimatedTotal += 150000;
+                else if (attackData.winRate > 0.4) estimatedTotal += 100000;
+                else estimatedTotal += 50000;
             }
             
-            // Position-based threat assessment
-            let positionThreatMultiplier = 1.0;
-            if (factionData.position) {
-                const position = factionData.position.toLowerCase();
-                if (position.includes('leader') || position.includes('co-leader')) {
-                    positionThreatMultiplier = 2.0;
-                } else if (position.includes('officer') || position.includes('sergeant')) {
-                    positionThreatMultiplier = 1.5;
-                }
+            // Look for honor/respect points (from PVP)
+            const honorData = this.scrapeHonorData();
+            if (honorData.found) {
+                battleDataPoints.push('Honor Points');
+                // Honor typically comes from successful fights
+                if (honorData.points > 10000) estimatedTotal += 300000;
+                else if (honorData.points > 5000) estimatedTotal += 200000;
+                else if (honorData.points > 1000) estimatedTotal += 100000;
+                else estimatedTotal += 50000;
             }
             
-            // Activity-based threat assessment
-            let activityMultiplier = 1.0;
-            if (profileIntel.lastAction) {
-                const lastAction = profileIntel.lastAction.toLowerCase();
-                if (lastAction.includes('online') || lastAction.includes('minute')) {
-                    activityMultiplier = 1.3; // Active players tend to have better stats
-                }
+            // Look for battle skills/experience
+            const battleSkills = this.scrapeBattleSkills();
+            if (battleSkills.found) {
+                battleDataPoints.push('Battle Skills');
+                estimatedTotal += battleSkills.skillLevel * 1000;
             }
             
-            // Networth-based intelligence (if available)
-            let networthMultiplier = 1.0;
-            if (profileIntel.networth && profileIntel.networth > 0) {
-                if (profileIntel.networth > 1000000000) networthMultiplier = 2.0; // Billionaire
-                else if (profileIntel.networth > 100000000) networthMultiplier = 1.7; // 100M+
-                else if (profileIntel.networth > 10000000) networthMultiplier = 1.3; // 10M+
+            // Look for war participation history
+            const warHistory = this.scrapeWarHistory();
+            if (warHistory.found) {
+                battleDataPoints.push('War Participation');
+                estimatedTotal += warHistory.participationScore * 50000;
             }
             
-            // Base threat calculation using multiple intelligence factors
-            const baseThreat = level * 1000; // Very conservative base
-            const adjustedThreat = baseThreat * factionThreatMultiplier * positionThreatMultiplier * activityMultiplier * networthMultiplier;
+            // Look for bounty/hit completion data
+            const bountyData = this.scrapeBountyData();
+            if (bountyData.found) {
+                battleDataPoints.push('Bounty Success');
+                estimatedTotal += bountyData.successRate * 100000;
+            }
             
-            // Categorize threat level
+            // Fallback to level-based estimation only if no battle data found
+            if (battleDataPoints.length === 0) {
+                this.log('⚠️ No battle data found, using conservative level-based estimate');
+                estimatedTotal = Math.max(level * 2000, 10000); // Very conservative
+                battleDataPoints.push('Level-based (no battle data)');
+                confidence = 'Limited data available';
+            }
+            
+            // Categorize threat level based on estimated total
             let threatLevel;
-            if (adjustedThreat < 50000) threatLevel = 'Low Threat';
-            else if (adjustedThreat < 200000) threatLevel = 'Moderate Threat';
-            else if (adjustedThreat < 500000) threatLevel = 'High Threat';
-            else if (adjustedThreat < 1000000) threatLevel = 'Elite Fighter';
+            if (estimatedTotal < 50000) threatLevel = 'Low Threat';
+            else if (estimatedTotal < 150000) threatLevel = 'Moderate Threat';
+            else if (estimatedTotal < 300000) threatLevel = 'High Threat';
+            else if (estimatedTotal < 500000) threatLevel = 'Elite Fighter';
             else threatLevel = 'Legendary';
             
-            // Win chance based on intelligence
+            // Calculate win chance
             let winChance;
-            if (adjustedThreat < 100000) winChance = '~75%';
-            else if (adjustedThreat < 300000) winChance = '~60%';
-            else if (adjustedThreat < 600000) winChance = '~45%';
-            else if (adjustedThreat < 1000000) winChance = '~30%';
+            const avgPlayerStats = 250000;
+            const ratio = avgPlayerStats / estimatedTotal;
+            if (ratio > 1.5) winChance = '~75%';
+            else if (ratio > 1.2) winChance = '~60%';
+            else if (ratio > 0.8) winChance = '~45%';
+            else if (ratio > 0.5) winChance = '~30%';
             else winChance = '~15%';
-            
-            const analysisFactors = [];
-            if (factionThreatMultiplier > 1.0) analysisFactors.push('Faction');
-            if (positionThreatMultiplier > 1.0) analysisFactors.push('Position');
-            if (activityMultiplier > 1.0) analysisFactors.push('Activity');
-            if (networthMultiplier > 1.0) analysisFactors.push('Wealth');
             
             return {
                 threatLevel,
                 winChance,
-                estimatedRange: `${Math.floor(adjustedThreat * 0.8).toLocaleString()} - ${Math.floor(adjustedThreat * 1.2).toLocaleString()}`,
-                analysisMethod: `Intelligence factors: ${analysisFactors.join(', ') || 'Basic profile'}`
+                estimatedRange: '~' + Math.floor(estimatedTotal * 0.8).toLocaleString() + ' - ' + Math.floor(estimatedTotal * 1.2).toLocaleString(),
+                analysisMethod: 'Battle analysis: ' + battleDataPoints.join(', '),
+                confidence
             };
+        }
+        
+        scrapeBattlePerformanceData() {
+            // Look for attack/defense records on profile
+            const battleElements = document.querySelectorAll('*');
+            let attackWins = 0, attackLosses = 0, found = false;
+            
+            battleElements.forEach(element => {
+                const text = element.textContent || '';
+                const attackWinMatch = text.match(/attack(?:s)?s*won[:s]*(d+)/i);
+                const attackLossMatch = text.match(/attack(?:s)?s*lost[:s]*(d+)/i);
+                
+                if (attackWinMatch) {
+                    attackWins = parseInt(attackWinMatch[1]);
+                    found = true;
+                }
+                if (attackLossMatch) {
+                    attackLosses = parseInt(attackLossMatch[1]);
+                    found = true;
+                }
+            });
+            
+            const winRate = attackWins + attackLosses > 0 ? attackWins / (attackWins + attackLosses) : 0;
+            return { found, winRate, wins: attackWins, losses: attackLosses };
+        }
+        
+        scrapeHonorData() {
+            // Look for honor/respect points
+            const elements = document.querySelectorAll('*');
+            let honorPoints = 0, found = false;
+            
+            elements.forEach(element => {
+                const text = element.textContent || '';
+                const honorMatch = text.match(/honor[:s]*(d{1,3}(?:,d{3})*)/i) || 
+                                 text.match(/respect[:s]*(d{1,3}(?:,d{3})*)/i);
+                
+                if (honorMatch) {
+                    honorPoints = parseInt(honorMatch[1].replace(/,/g, ''));
+                    found = true;
+                }
+            });
+            
+            return { found, points: honorPoints };
+        }
+        
+        scrapeBattleSkills() {
+            // Look for fighting/battle skill levels
+            const elements = document.querySelectorAll('*');
+            let skillLevel = 0, found = false;
+            
+            elements.forEach(element => {
+                const text = element.textContent || '';
+                const skillMatch = text.match(/(?:fighting|combat|martial)s*(?:skill|level)[:s]*(d+)/i);
+                
+                if (skillMatch) {
+                    skillLevel = parseInt(skillMatch[1]);
+                    found = true;
+                }
+            });
+            
+            return { found, skillLevel };
+        }
+        
+        scrapeWarHistory() {
+            // Look for war participation indicators
+            const elements = document.querySelectorAll('*');
+            let participationScore = 0, found = false;
+            
+            elements.forEach(element => {
+                const text = element.textContent || '';
+                if (text.toLowerCase().includes('war') && text.toLowerCase().includes('won')) {
+                    participationScore += 1;
+                    found = true;
+                } else if (text.toLowerCase().includes('battle') && text.toLowerCase().includes('veteran')) {
+                    participationScore += 2;
+                    found = true;
+                }
+            });
+            
+            return { found, participationScore };
+        }
+        
+        scrapeBountyData() {
+            // Look for bounty completion data
+            const elements = document.querySelectorAll('*');
+            let successRate = 0, found = false;
+            
+            elements.forEach(element => {
+                const text = element.textContent || '';
+                const bountyMatch = text.match(/bounty[:s]*(d+)/i);
+                
+                if (bountyMatch) {
+                    const bountyCount = parseInt(bountyMatch[1]);
+                    successRate = Math.min(bountyCount / 100, 1.0); // Normalize to 0-1
+                    found = true;
+                }
+            });
+            
+            return { found, successRate };
         }
         
         categorizeBattleStats(totalStats) {
@@ -701,23 +806,55 @@
                 });
             }
             
-            // Method 3: Network request interception (if available)
-            if (!battleStats.found && window.fetch) {
-                this.log('🔍 Method 3: Attempting network data interception');
-                try {
-                    // Look for cached API responses in browser
-                    const performance = window.performance;
-                    if (performance && performance.getEntries) {
-                        const entries = performance.getEntries();
-                        entries.forEach(entry => {
-                            if (entry.name && (entry.name.includes('api') || entry.name.includes('torn'))) {
-                                this.log(`📡 Found API call: ${entry.name}`);
-                                // Note: We can't access response data directly due to CORS, but we can note the presence
+            // Method 3: Page source and meta content analysis
+            if (!battleStats.found) {
+                this.log('🔍 Method 3: Page source and meta content analysis');
+                
+                // Check meta tags for battle stats
+                const metaTags = document.querySelectorAll('meta');
+                metaTags.forEach(meta => {
+                    const content = meta.getAttribute('content') || '';
+                    const name = meta.getAttribute('name') || '';
+                    
+                    // Look for stats in meta content
+                    Object.entries(statPatterns).forEach(([statType, pattern]) => {
+                        if (!battleStats[statType]) {
+                            const match = (content + ' ' + name).match(pattern);
+                            if (match && match[1]) {
+                                const value = parseInt(match[1].replace(/,/g, ''));
+                                if (value > 0 && value < 10000000) {
+                                    battleStats[statType] = value;
+                                    battleStats.found = true;
+                                    battleStats.method = 'meta-content';
+                                    battleStats.confidence = Math.max(battleStats.confidence, 75);
+                                    this.log(`✅ Found ${statType}: ${value} in meta content`);
+                                }
                             }
-                        });
-                    }
-                } catch (e) {
-                    this.log('⚠️ Network interception not available');
+                        }
+                    });
+                });
+                
+                // Check HTML comments for stats
+                const htmlSource = document.documentElement.outerHTML;
+                const commentPattern = /<!--[sS]*?-->/g;
+                let commentMatch;
+                while ((commentMatch = commentPattern.exec(htmlSource)) !== null) {
+                    const comment = commentMatch[0];
+                    Object.entries(statPatterns).forEach(([statType, pattern]) => {
+                        if (!battleStats[statType]) {
+                            const match = comment.match(pattern);
+                            if (match && match[1]) {
+                                const value = parseInt(match[1].replace(/,/g, ''));
+                                if (value > 0 && value < 10000000) {
+                                    battleStats[statType] = value;
+                                    battleStats.found = true;
+                                    battleStats.method = 'html-comments';
+                                    battleStats.confidence = Math.max(battleStats.confidence, 70);
+                                    this.log(`✅ Found ${statType}: ${value} in HTML comments`);
+                                }
+                            }
+                        }
+                    });
                 }
             }
             
@@ -749,48 +886,69 @@
                 });
             }
             
-            // Method 5: Deep pattern analysis of all text nodes
+            // Method 5: Form data and input value extraction
             if (!battleStats.found) {
-                this.log('🔍 Method 5: Deep text pattern analysis');
-                const walker = document.createTreeWalker(
-                    document.body,
-                    NodeFilter.SHOW_TEXT,
-                    null,
-                    false
-                );
+                this.log('🔍 Method 5: Form data and input value extraction');
                 
-                let node;
-                while (node = walker.nextNode()) {
-                    const text = node.textContent.trim();
-                    if (text.length > 3 && /d/.test(text)) {
-                        // Look for stat-like patterns in raw text
-                        const patterns = [
-                            /(d{1,3}(?:,d{3})*)s*(?:str|strength)/i,
-                            /(?:str|strength)[:=s]*(d{1,3}(?:,d{3})*)/i,
-                            /(d{1,3}(?:,d{3})*)s*(?:def|defense|defence)/i,
-                            /(?:def|defense|defence)[:=s]*(d{1,3}(?:,d{3})*)/i,
-                            /(d{1,3}(?:,d{3})*)s*(?:spd|speed)/i,
-                            /(?:spd|speed)[:=s]*(d{1,3}(?:,d{3})*)/i,
-                            /(d{1,3}(?:,d{3})*)s*(?:dex|dexterity)/i,
-                            /(?:dex|dexterity)[:=s]*(d{1,3}(?:,d{3})*)/i
-                        ];
-                        
-                        patterns.forEach((pattern, index) => {
-                            const match = text.match(pattern);
+                // Check all form elements and inputs
+                const formElements = document.querySelectorAll('input, textarea, select, option');
+                formElements.forEach(element => {
+                    const value = element.value || element.textContent || '';
+                    const name = (element.name || element.id || '').toLowerCase();
+                    const placeholder = (element.placeholder || '').toLowerCase();
+                    const allText = value + ' ' + name + ' ' + placeholder;
+                    
+                    Object.entries(statPatterns).forEach(([statType, pattern]) => {
+                        if (!battleStats[statType]) {
+                            const match = allText.match(pattern);
                             if (match && match[1]) {
-                                const value = parseInt(match[1].replace(/,/g, ''));
-                                if (value > 100 && value < 10000000) {
-                                    const statType = ['strength', 'strength', 'defense', 'defense', 'speed', 'speed', 'dexterity', 'dexterity'][index];
-                                    if (!battleStats[statType]) {
-                                        battleStats[statType] = value;
-                                        battleStats.found = true;
-                                        battleStats.method = 'deep-text-analysis';
-                                        battleStats.confidence = 75;
-                                        this.log(`🔍 Deep scan found ${statType}: ${value}`);
-                                    }
+                                const num = parseInt(match[1].replace(/,/g, ''));
+                                if (num > 100 && num < 10000000) {
+                                    battleStats[statType] = num;
+                                    battleStats.found = true;
+                                    battleStats.method = 'form-data-extraction';
+                                    battleStats.confidence = Math.max(battleStats.confidence, 80);
+                                    this.log(`✅ Found ${statType}: ${num} in form data`);
                                 }
                             }
-                        });
+                        }
+                    });
+                });
+                
+                // Check for JSON data in page
+                const jsonPattern = /"(?:str|strength|def|defense|spd|speed|dex|dexterity)":s*(d+)/gi;
+                let jsonMatch;
+                while ((jsonMatch = jsonPattern.exec(document.documentElement.innerHTML)) !== null) {
+                    const value = parseInt(jsonMatch[1]);
+                    if (value > 100 && value < 10000000) {
+                        // Try to identify which stat this is
+                        const contextBefore = document.documentElement.innerHTML.substring(Math.max(0, jsonMatch.index - 50), jsonMatch.index);
+                        const contextAfter = document.documentElement.innerHTML.substring(jsonMatch.index, jsonMatch.index + 100);
+                        const context = (contextBefore + contextAfter).toLowerCase();
+                        
+                        if (context.includes('str') && !battleStats.strength) {
+                            battleStats.strength = value;
+                            battleStats.found = true;
+                            battleStats.method = 'json-data-extraction';
+                            battleStats.confidence = Math.max(battleStats.confidence, 85);
+                        } else if (context.includes('def') && !battleStats.defense) {
+                            battleStats.defense = value;
+                            battleStats.found = true;
+                            battleStats.method = 'json-data-extraction';
+                            battleStats.confidence = Math.max(battleStats.confidence, 85);
+                        } else if (context.includes('spd') || context.includes('speed')) {
+                            if (!battleStats.speed) {
+                                battleStats.speed = value;
+                                battleStats.found = true;
+                                battleStats.method = 'json-data-extraction';
+                                battleStats.confidence = Math.max(battleStats.confidence, 85);
+                            }
+                        } else if (context.includes('dex') && !battleStats.dexterity) {
+                            battleStats.dexterity = value;
+                            battleStats.found = true;
+                            battleStats.method = 'json-data-extraction';
+                            battleStats.confidence = Math.max(battleStats.confidence, 85);
+                        }
                     }
                 }
             }
