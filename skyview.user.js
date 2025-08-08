@@ -134,9 +134,13 @@
                 this.updateIndicator(`🔗 Testing ${i + 1}/${CONFIG.botEndpoints.length}`);
                 
                 try {
+                    // Add small delay between requests to avoid overwhelming
+                    if (i > 0) {
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                    
                     const response = await this.makeRequest(endpoint, {
                         method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
                         data: JSON.stringify({
                             action: 'verify-api-key',
                             apiKey: apiKey
@@ -145,15 +149,31 @@
                     
                     console.log(`[Skyview] Endpoint ${i + 1} response:`, response);
                     
-                    if (response && response.success) {
+                    if (response && response.success === true) {
                         this.authenticated = true;
-                        this.workingEndpoint = i; // Remember which endpoint works
+                        this.workingEndpoint = i;
                         this.updateIndicator('✅ Connected');
-                        this.log(`Authentication successful with endpoint ${i + 1}!`);
+                        this.log(`✅ Authentication successful with endpoint ${i + 1}!`);
                         console.log(`[Skyview] ✅ Successfully authenticated with endpoint ${i + 1}`);
+                        
+                        // Test data endpoint as well
+                        try {
+                            const testData = await this.makeRequest(CONFIG.dataEndpoints[i], {
+                                method: 'POST',
+                                data: JSON.stringify({
+                                    type: 'connection-test',
+                                    apiKey: apiKey,
+                                    timestamp: Date.now()
+                                })
+                            });
+                            console.log('[Skyview] Data endpoint test:', testData);
+                        } catch (e) {
+                            console.log('[Skyview] Data endpoint test failed (non-critical):', e.message);
+                        }
+                        
                         return;
                     } else {
-                        const errorMsg = response?.error || 'Unknown error';
+                        const errorMsg = response?.error || 'Authentication failed';
                         this.log(`Endpoint ${i + 1} auth failed: ${errorMsg}`);
                         lastError = errorMsg;
                         
@@ -169,6 +189,11 @@
                     this.logError(`Endpoint ${i + 1} connection failed:`, error);
                     lastError = errorMsg;
                     console.error(`[Skyview] Endpoint ${i + 1} failed:`, errorMsg);
+                    
+                    // If it's a network error, try next endpoint immediately
+                    if (errorMsg.includes('Network') || errorMsg.includes('timeout')) {
+                        continue;
+                    }
                 }
             }
             
@@ -355,36 +380,71 @@
             return new Promise((resolve, reject) => {
                 this.log(`Making request to: ${url}`);
                 
-                GM_xmlhttpRequest({
+                // Enhanced request configuration for PDA compatibility
+                const requestConfig = {
                     method: options.method || 'GET',
                     url: url,
-                    headers: options.headers || {},
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'User-Agent': 'Brother-Owl-Skyview/1.0',
+                        ...options.headers
+                    },
                     data: options.data,
-                    timeout: 15000, // 15 second timeout
+                    timeout: 20000, // Increased to 20 seconds for slower connections
+                    responseType: 'text',
                     onload: function(response) {
+                        console.log(`[Skyview] Response status: ${response.status}`);
+                        console.log(`[Skyview] Response headers: ${JSON.stringify(response.responseHeaders)}`);
+                        console.log(`[Skyview] Response text: ${response.responseText.substring(0, 300)}`);
+                        
                         try {
-                            console.log(`[Skyview] Response status: ${response.status}, text: ${response.responseText.substring(0, 200)}`);
-                            
-                            if (response.status >= 200 && response.status < 300) {
-                                const data = JSON.parse(response.responseText);
-                                resolve(data);
+                            // More robust status checking
+                            if (response.status === 200 || response.status === 201) {
+                                if (response.responseText) {
+                                    const data = JSON.parse(response.responseText);
+                                    resolve(data);
+                                } else {
+                                    reject(new Error('Empty response body'));
+                                }
+                            } else if (response.status === 0) {
+                                // Status 0 often means CORS or network issue
+                                reject(new Error('Network error - possible CORS issue or bot offline'));
                             } else {
-                                reject(new Error(`HTTP ${response.status}: ${response.statusText}`));
+                                reject(new Error(`HTTP ${response.status}: ${response.statusText || 'Unknown error'}`));
                             }
                         } catch (e) {
-                            console.error('[Skyview] JSON parse error:', e, 'Response:', response.responseText);
-                            reject(new Error(`Failed to parse response: ${e.message}`));
+                            console.error('[Skyview] JSON parse error:', e);
+                            console.error('[Skyview] Raw response:', response.responseText);
+                            reject(new Error(`JSON parse failed: ${e.message}`));
                         }
                     },
                     onerror: function(error) {
-                        console.error('[Skyview] Network error:', error);
-                        reject(new Error(`Network error: ${error.error || 'Connection failed'}`));
+                        console.error('[Skyview] Request error:', error);
+                        console.error('[Skyview] Error details:', JSON.stringify(error));
+                        
+                        // More specific error messages
+                        if (error.error === 'NetworkError' || error.error === 'NS_ERROR_FAILURE') {
+                            reject(new Error('Network connection failed - check internet or bot status'));
+                        } else if (error.error === 'TimeoutError') {
+                            reject(new Error('Request timed out - bot may be slow or offline'));
+                        } else {
+                            reject(new Error(`Connection error: ${error.error || 'Unknown network issue'}`));
+                        }
                     },
                     ontimeout: function() {
-                        console.error('[Skyview] Request timeout');
-                        reject(new Error('Request timeout'));
+                        console.error('[Skyview] Request timeout after 20 seconds');
+                        reject(new Error('Connection timeout - bot may be offline'));
                     }
-                });
+                };
+                
+                // Execute the request
+                try {
+                    GM_xmlhttpRequest(requestConfig);
+                } catch (e) {
+                    console.error('[Skyview] GM_xmlhttpRequest failed:', e);
+                    reject(new Error(`Request setup failed: ${e.message}`));
+                }
             });
         }
         
