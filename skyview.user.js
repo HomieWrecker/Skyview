@@ -110,6 +110,8 @@
         }
         
         async authenticate() {
+            this.updateIndicator('🔗 Connecting...');
+            
             let apiKey = GM_getValue('brotherOwl_apiKey');
             
             if (!apiKey) {
@@ -121,11 +123,15 @@
             }
             
             this.apiKey = apiKey;
+            console.log('[Skyview] Starting authentication with', CONFIG.botEndpoints.length, 'endpoints');
+            
+            let lastError = null;
             
             // Try each endpoint until one works
             for (let i = 0; i < CONFIG.botEndpoints.length; i++) {
                 const endpoint = CONFIG.botEndpoints[i];
                 this.log(`Trying endpoint ${i + 1}/${CONFIG.botEndpoints.length}: ${endpoint}`);
+                this.updateIndicator(`🔗 Testing ${i + 1}/${CONFIG.botEndpoints.length}`);
                 
                 try {
                     const response = await this.makeRequest(endpoint, {
@@ -137,25 +143,50 @@
                         })
                     });
                     
+                    console.log(`[Skyview] Endpoint ${i + 1} response:`, response);
+                    
                     if (response && response.success) {
                         this.authenticated = true;
                         this.workingEndpoint = i; // Remember which endpoint works
                         this.updateIndicator('✅ Connected');
-                        this.log('Authentication successful!');
+                        this.log(`Authentication successful with endpoint ${i + 1}!`);
+                        console.log(`[Skyview] ✅ Successfully authenticated with endpoint ${i + 1}`);
                         return;
                     } else {
-                        this.log(`Endpoint ${i + 1} auth failed: ${response?.error || 'Unknown error'}`);
+                        const errorMsg = response?.error || 'Unknown error';
+                        this.log(`Endpoint ${i + 1} auth failed: ${errorMsg}`);
+                        lastError = errorMsg;
+                        
+                        // If API key not registered, don't try other endpoints
+                        if (errorMsg.includes('not registered')) {
+                            console.log('[Skyview] API key not registered, stopping endpoint tests');
+                            break;
+                        }
                     }
                     
                 } catch (error) {
+                    const errorMsg = error.message || error.toString();
                     this.logError(`Endpoint ${i + 1} connection failed:`, error);
+                    lastError = errorMsg;
+                    console.error(`[Skyview] Endpoint ${i + 1} failed:`, errorMsg);
                 }
             }
             
             // If we get here, all endpoints failed
             this.updateIndicator('❌ Connection error');
-            this.log('All endpoints failed. Please check your API key and bot status.');
-            GM_setValue('brotherOwl_apiKey', null); // Clear invalid key
+            
+            const errorDetails = lastError || 'Unknown error';
+            console.error('[Skyview] All endpoints failed. Last error:', errorDetails);
+            
+            if (errorDetails.includes('not registered')) {
+                this.log('❌ API key not registered with Brother Owl bot. Use /apikey set in Discord first.');
+                alert('🦉 Brother Owl Setup Required\n\nYour API key is not registered with the bot.\n\n1. Go to Discord\n2. Use /apikey set [your-api-key]\n3. Refresh this page\n\nThen the userscript will connect properly.');
+            } else {
+                this.log('❌ Connection failed: ' + errorDetails);
+                alert(`🦉 Brother Owl Connection Failed\n\nError: ${errorDetails}\n\n1. Check your internet connection\n2. Verify bot is online\n3. Try refreshing the page\n\nClick the 🦉 indicator for more details.`);
+            }
+            
+            GM_setValue('brotherOwl_apiKey', null); // Clear potentially invalid key
         }
         
         promptForApiKey() {
@@ -322,21 +353,36 @@
         
         makeRequest(url, options) {
             return new Promise((resolve, reject) => {
+                this.log(`Making request to: ${url}`);
+                
                 GM_xmlhttpRequest({
                     method: options.method || 'GET',
                     url: url,
                     headers: options.headers || {},
                     data: options.data,
+                    timeout: 15000, // 15 second timeout
                     onload: function(response) {
                         try {
-                            const data = JSON.parse(response.responseText);
-                            resolve(data);
+                            console.log(`[Skyview] Response status: ${response.status}, text: ${response.responseText.substring(0, 200)}`);
+                            
+                            if (response.status >= 200 && response.status < 300) {
+                                const data = JSON.parse(response.responseText);
+                                resolve(data);
+                            } else {
+                                reject(new Error(`HTTP ${response.status}: ${response.statusText}`));
+                            }
                         } catch (e) {
-                            reject(e);
+                            console.error('[Skyview] JSON parse error:', e, 'Response:', response.responseText);
+                            reject(new Error(`Failed to parse response: ${e.message}`));
                         }
                     },
                     onerror: function(error) {
-                        reject(error);
+                        console.error('[Skyview] Network error:', error);
+                        reject(new Error(`Network error: ${error.error || 'Connection failed'}`));
+                    },
+                    ontimeout: function() {
+                        console.error('[Skyview] Request timeout');
+                        reject(new Error('Request timeout'));
                     }
                 });
             });
