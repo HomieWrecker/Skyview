@@ -174,12 +174,13 @@
                             'Content-Type': 'application/json'
                         },
                         data: JSON.stringify({
+                            action: 'verify-api-key',
                             apiKey: this.apiKey,
                             userscriptVersion: '3.2.1'
                         })
                     });
                     
-                    if (success && success.authenticated) {
+                    if (success && success.success) {
                         this.isAuthenticated = true;
                         this.currentEndpoint = endpoint.replace('/api/skyview-auth', '');
                         this.updateIndicator(`✅ ${success.username || 'Connected'}`);
