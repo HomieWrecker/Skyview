@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         BOS
-// @namespace    Homiewrecker
-// @version      3.2.0
-// @author       Grand Code [48572]
+// @namespace    Brother Owl's Skyview
+// @version      3.2.1
+// @author       Homiewrecker
 // @description  Advanced battle intelligence and stat estimation for Torn PDA
 // @icon         🦉
 // @match        https://www.torn.com/profiles.php?*
