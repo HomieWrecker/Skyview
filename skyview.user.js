@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         BOS
 // @namespace    Brother Owl's Skyview
-// @version      3.2.1
+// @version      3.2.2
 // @author       Homiewrecker
 // @description  Advanced battle intelligence and stat estimation for Torn PDA
 // @icon         🦉
@@ -176,7 +176,7 @@
                         data: JSON.stringify({
                             action: 'verify-api-key',
                             apiKey: this.apiKey,
-                            userscriptVersion: '3.2.1'
+                            userscriptVersion: '3.2.2'
                         })
                     });
                     
