@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Brother Owl Skyview - Intelligence System
-// @namespace    BrotherOwl
-// @version      3.1
+// @name         BOS
+// @namespace    Homiewrecker
+// @version      3.2.0
 // @author       Grand Code [48572]
 // @description  Advanced battle intelligence and stat estimation for Torn PDA
 // @icon         🦉
