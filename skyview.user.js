@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Brother Owl Skyview - Advanced Battle Intelligence
 // @namespace    https://torn.com/profiles.php?XID=2353116
-// @version      4.0.2
+// @version      4.0.3
 // @author       Homiewrecker [2353116] - Based on TSC Companion & Wall Battle Stats
 // @description  Professional battle stats estimation with advanced caching - TSC Companion inspired
 // @icon         🦉
@@ -29,7 +29,7 @@
         CACHE_DURATION: 12 * 60 * 60 * 1000, // 12 hours like TSC Companion
         API_TIMEOUT: 30000,
         ESTIMATION_METHODS: ['level_progression', 'activity_weighting', 'battle_analysis'],
-        DEBUG: false
+        DEBUG: true
     };
     
     // ========== STYLING ==========
@@ -291,19 +291,81 @@
         static displayBattleStats(userData) {
             const estimation = BattleStatsEstimator.estimate(userData.level, userData.last_action?.relative);
             
-            // Find appropriate insertion point
-            const profileContainer = document.querySelector('.profile-container, .basic-info, .user-info');
-            if (!profileContainer) return;
+            SkyviewLogger.info(`Displaying stats for ${userData.name} [Level ${userData.level}]`);
+            
+            // Find appropriate insertion point - try multiple selectors
+            const selectors = [
+                '.profile-container',
+                '.basic-info', 
+                '.user-info',
+                '.content-wrapper',
+                '.profile-wrapper',
+                '[class*="profile"]',
+                'h4'
+            ];
+            
+            let insertionPoint = null;
+            for (const selector of selectors) {
+                insertionPoint = document.querySelector(selector);
+                if (insertionPoint) {
+                    SkyviewLogger.info(`Found insertion point: ${selector}`);
+                    break;
+                }
+            }
+            
+            if (!insertionPoint) {
+                SkyviewLogger.warn('No suitable insertion point found for profile stats');
+                // Create floating stats instead
+                this.createFloatingStats(estimation, userData);
+                return;
+            }
             
             const statsDisplay = document.createElement('div');
             statsDisplay.className = 'skyview-stat-display';
             statsDisplay.innerHTML = `≈${BattleStatsEstimator.formatNumber(estimation.total)}`;
             statsDisplay.title = `Battle Stats Estimate: ${estimation.total.toLocaleString()}\nConfidence: ${(estimation.confidence * 100).toFixed(0)}%\nLevel: ${userData.level}`;
             
-            const nameElement = document.querySelector('.player-name, .name, h4');
+            // Try multiple name selectors
+            const nameSelectors = ['.player-name', '.name', 'h4', '[class*="name"]', '.profile-name'];
+            let nameElement = null;
+            
+            for (const selector of nameSelectors) {
+                nameElement = document.querySelector(selector);
+                if (nameElement) {
+                    SkyviewLogger.info(`Found name element: ${selector}`);
+                    break;
+                }
+            }
+            
             if (nameElement) {
                 nameElement.appendChild(statsDisplay);
+            } else {
+                insertionPoint.appendChild(statsDisplay);
             }
+        }
+        
+        static createFloatingStats(estimation, userData) {
+            const floatingDiv = document.createElement('div');
+            floatingDiv.style.cssText = `
+                position: fixed;
+                top: 60px;
+                right: 10px;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 10px;
+                border-radius: 8px;
+                font-size: 12px;
+                z-index: 10000;
+                font-family: monospace;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+            `;
+            floatingDiv.innerHTML = `
+                🦉 <strong>${userData.name}</strong> [Level ${userData.level}]<br>
+                Battle Stats: <strong>≈${BattleStatsEstimator.formatNumber(estimation.total)}</strong><br>
+                Confidence: ${(estimation.confidence * 100).toFixed(0)}%
+            `;
+            
+            document.body.appendChild(floatingDiv);
         }
         
         static createProfileTable(userData) {
@@ -457,13 +519,19 @@
     function initializeSkyview() {
         SkyviewLogger.info('Skyview Advanced Battle Intelligence starting...');
         
+        // Always show that script is running
+        showSkyviewStatus();
+        
         // Check for API key
-        if (!storage.get('api-key')) {
-            SkyviewLogger.warn('API key not found. Please set it in localStorage: skyview-data-api-key');
+        const apiKey = storage.get('api-key');
+        if (!apiKey) {
+            SkyviewLogger.warn('API key not found. Please set using: window.setSkyviewApiKey("your_key_here")');
+            showApiKeyPrompt();
             return;
         }
         
         const currentPage = window.location.pathname;
+        SkyviewLogger.info(`Processing page: ${currentPage}`);
         
         if (currentPage === '/profiles.php') {
             ProfilePageHandler.handle();
@@ -471,9 +539,71 @@
             AttackPageHandler.handle();
         } else if (currentPage === '/factions.php') {
             FactionPageHandler.handle();
+        } else {
+            SkyviewLogger.info('Page not supported for battle stats analysis');
         }
         
         SkyviewLogger.info('Skyview initialization complete');
+    }
+    
+    // Show visual indicator that script is loaded
+    function showSkyviewStatus() {
+        const statusDiv = document.createElement('div');
+        statusDiv.id = 'skyview-status';
+        statusDiv.style.cssText = `
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #4A90E2;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 10000;
+            font-family: monospace;
+        `;
+        statusDiv.innerHTML = '🦉 Skyview v4.0.3 Loaded';
+        document.body.appendChild(statusDiv);
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+            if (statusDiv && statusDiv.parentNode) {
+                statusDiv.parentNode.removeChild(statusDiv);
+            }
+        }, 3000);
+    }
+    
+    // Show API key setup prompt
+    function showApiKeyPrompt() {
+        const promptDiv = document.createElement('div');
+        promptDiv.style.cssText = `
+            position: fixed;
+            top: 50px;
+            right: 10px;
+            background: #f44336;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 12px;
+            z-index: 10000;
+            font-family: monospace;
+            max-width: 300px;
+            cursor: pointer;
+        `;
+        promptDiv.innerHTML = `
+            🦉 Skyview: API Key Required<br>
+            <small>Click to setup API key</small>
+        `;
+        
+        promptDiv.onclick = function() {
+            const apiKey = prompt('Enter your Torn API key:');
+            if (apiKey) {
+                storage.set('api-key', apiKey);
+                location.reload();
+            }
+        };
+        
+        document.body.appendChild(promptDiv);
     }
     
     // ========== STARTUP ==========
