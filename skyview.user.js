@@ -1,9 +1,9 @@
 // ==UserScript==
 // @name         BOS
-// @namespace    https://torn.com/profiles.php?XID=2353116  
-// @version      5.0.1
+// @namespace    Skyview  
+// @version      5.0.2
 // @author       Homiewrecker
-// @description  Grand Code's person battle eye
+// @description  Grand Code's personal battle eye
 // @icon         🦉
 // @match        https://www.torn.com/profiles.php?*
 // @match        https://www.torn.com/factions.php*
@@ -281,28 +281,51 @@
             const profileContent = document.querySelector('.profile-container, .user-info-blackbox, .content-wrapper');
             if (!profileContent) return;
             
-            // Add quick navigation and utility buttons
-            const quickNav = document.createElement('div');
-            quickNav.innerHTML = `
-                <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 10px; border-radius: 8px; margin: 10px 0; color: white; font-family: monospace;">
-                    <strong>🚀 SKYVIEW QUICK UTILITIES</strong><br>
-                    <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
-                        <button onclick="window.open('/loader.php?sid=attack&user2ID=' + window.location.search.match(/XID=(\\d+)/)?.[1], '_blank')" 
-                                style="padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;">
-                            ⚔️ Attack
-                        </button>
-                        <button onclick="navigator.clipboard.writeText('https://www.torn.com' + window.location.pathname + window.location.search); alert('Profile link copied!')" 
-                                style="padding: 4px 8px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;">
-                            📋 Copy Link
-                        </button>
-                        <button onclick="window.open('/messages.php#/p=compose&XID=' + window.location.search.match(/XID=(\\d+)/)?.[1], '_blank')" 
-                                style="padding: 4px 8px; background: #2ecc71; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;">
-                            💬 Message
-                        </button>
-                    </div>
-                </div>
-            `;
-            profileContent.insertBefore(quickNav, profileContent.firstChild);
+            const container = document.createElement('div');
+            container.style.cssText = 'background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 10px; border-radius: 8px; margin: 10px 0; color: white; font-family: monospace;';
+            
+            const title = document.createElement('div');
+            title.innerHTML = '<strong>🚀 SKYVIEW QUICK UTILITIES</strong>';
+            title.style.marginBottom = '8px';
+            
+            const buttonContainer = document.createElement('div');
+            buttonContainer.style.cssText = 'display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;';
+            
+            // Attack button
+            const attackBtn = document.createElement('button');
+            attackBtn.textContent = '⚔️ Attack';
+            attackBtn.style.cssText = 'padding: 4px 8px; background: #e74c3c; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;';
+            attackBtn.addEventListener('click', () => {
+                const userId = window.location.search.match(/XID=(\d+)/)?.[1];
+                if (userId) window.open('/loader.php?sid=attack&user2ID=' + userId, '_blank');
+            });
+            
+            // Copy link button
+            const copyBtn = document.createElement('button');
+            copyBtn.textContent = '📋 Copy Link';
+            copyBtn.style.cssText = 'padding: 4px 8px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;';
+            copyBtn.addEventListener('click', () => {
+                navigator.clipboard.writeText('https://www.torn.com' + window.location.pathname + window.location.search);
+                alert('Profile link copied!');
+            });
+            
+            // Message button
+            const messageBtn = document.createElement('button');
+            messageBtn.textContent = '💬 Message';
+            messageBtn.style.cssText = 'padding: 4px 8px; background: #2ecc71; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 11px;';
+            messageBtn.addEventListener('click', () => {
+                const userId = window.location.search.match(/XID=(\d+)/)?.[1];
+                if (userId) window.open('/messages.php#/p=compose&XID=' + userId, '_blank');
+            });
+            
+            buttonContainer.appendChild(attackBtn);
+            buttonContainer.appendChild(copyBtn);
+            buttonContainer.appendChild(messageBtn);
+            
+            container.appendChild(title);
+            container.appendChild(buttonContainer);
+            
+            profileContent.insertBefore(container, profileContent.firstChild);
         },
         
         // Market page enhancements
@@ -372,31 +395,46 @@
             });
         },
         
-        // Enhanced faction page utilities
+        // Enhanced faction page utilities  
         addFactionPageUtilities: () => {
             const memberList = document.querySelector('.faction-members, .members-list, [class*="member"]');
             if (memberList) {
-                const utilityBar = document.createElement('div');
-                utilityBar.innerHTML = `
-                    <div style="background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%); padding: 12px; border-radius: 8px; margin: 10px 0; color: white;">
-                        <strong>🔧 FACTION UTILITIES</strong><br>
-                        <div style="display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;">
-                            <button onclick="TSCUtilities.exportMemberList()" 
-                                    style="padding: 6px 12px; background: #2ecc71; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                                📊 Export Members
-                            </button>
-                            <button onclick="TSCUtilities.analyzeActivity()" 
-                                    style="padding: 6px 12px; background: #f39c12; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                                📈 Activity Analysis
-                            </button>
-                            <button onclick="TSCUtilities.bulkProfile()" 
-                                    style="padding: 6px 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                                👥 Bulk Profile
-                            </button>
-                        </div>
-                    </div>
-                `;
-                memberList.insertBefore(utilityBar, memberList.firstChild);
+                const container = document.createElement('div');
+                container.style.cssText = 'background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%); padding: 12px; border-radius: 8px; margin: 10px 0; color: white;';
+                
+                const title = document.createElement('div');
+                title.innerHTML = '<strong>🔧 FACTION UTILITIES</strong>';
+                title.style.marginBottom = '8px';
+                
+                const buttonContainer = document.createElement('div');
+                buttonContainer.style.cssText = 'display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap;';
+                
+                // Export button
+                const exportBtn = document.createElement('button');
+                exportBtn.textContent = '📊 Export Members';
+                exportBtn.style.cssText = 'padding: 6px 12px; background: #2ecc71; color: white; border: none; border-radius: 4px; cursor: pointer;';
+                exportBtn.addEventListener('click', () => TSCUtilities.exportMemberList());
+                
+                // Activity button
+                const activityBtn = document.createElement('button');
+                activityBtn.textContent = '📈 Activity Analysis';
+                activityBtn.style.cssText = 'padding: 6px 12px; background: #f39c12; color: white; border: none; border-radius: 4px; cursor: pointer;';
+                activityBtn.addEventListener('click', () => TSCUtilities.analyzeActivity());
+                
+                // Bulk profile button
+                const bulkBtn = document.createElement('button');
+                bulkBtn.textContent = '👥 Bulk Profile';
+                bulkBtn.style.cssText = 'padding: 6px 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer;';
+                bulkBtn.addEventListener('click', () => TSCUtilities.bulkProfile());
+                
+                buttonContainer.appendChild(exportBtn);
+                buttonContainer.appendChild(activityBtn);
+                buttonContainer.appendChild(bulkBtn);
+                
+                container.appendChild(title);
+                container.appendChild(buttonContainer);
+                
+                memberList.insertBefore(container, memberList.firstChild);
             }
         },
         
@@ -746,22 +784,36 @@
         }
         
         static showApiKeyPrompt() {
-            const content = `
-            <div style="background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; padding: 15px; border-radius: 8px; font-family: monospace; border: 2px solid #c0392b;">
-                <strong>❌ API KEY REQUIRED</strong><br>
-                Brother Owl Skyview requires your Torn API key for enhanced features.<br>
-                <button onclick="
-                    const key = prompt('Enter your Torn API key (Full Access recommended):');
-                    if (key) {
-                        GM_setValue('api-key', key);
-                        location.reload();
+            const container = document.createElement('div');
+            container.style.cssText = 'background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%); color: white; padding: 15px; border-radius: 8px; font-family: monospace; border: 2px solid #c0392b;';
+            
+            const text = document.createElement('div');
+            text.innerHTML = '<strong>❌ API KEY REQUIRED</strong><br>BOS requires your Torn API key for enhanced features.';
+            
+            const button = document.createElement('button');
+            button.textContent = 'Set API Key';
+            button.style.cssText = 'margin-top: 10px; padding: 8px 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;';
+            
+            button.addEventListener('click', function() {
+                const key = window.prompt('Enter your Torn API key (Full Access recommended):');
+                if (key && key.trim()) {
+                    try {
+                        GM_setValue('api-key', key.trim());
+                        SkyviewLogger.info('API key saved successfully');
+                        window.location.reload();
+                    } catch (error) {
+                        SkyviewLogger.error('Failed to save API key:', error);
+                        alert('Failed to save API key. Please try again.');
                     }
-                " style="margin-top: 10px; padding: 8px 12px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                    Set API Key
-                </button>
-            </div>
-            `;
-            this.addToAttackPage(content);
+                } else if (key !== null) {
+                    alert('Please enter a valid API key.');
+                }
+            });
+            
+            container.appendChild(text);
+            container.appendChild(button);
+            
+            this.addToAttackPage(container.outerHTML);
         }
         
         static showErrorMessage(error) {
@@ -953,7 +1005,7 @@
         }
     }
     
-    // API Key Management
+    // API Key Management - Fixed Button Functionality
     function showApiKeyPrompt() {
         if (document.getElementById('skyview-api-prompt')) return;
         
@@ -971,23 +1023,72 @@
             font-family: monospace;
             max-width: 300px;
             border: 2px solid #e74c3c;
-        `;
-        prompt.innerHTML = `
-            <strong>🦉 BOS v5.0.1</strong><br>
-            API key required for enhanced features.<br>
-            <button onclick="
-                const key = prompt('Enter your Torn API key:');
-                if (key) {
-                    GM_setValue('api-key', key);
-                    this.parentElement.remove();
-                    location.reload();
-                }
-            " style="margin-top: 10px; padding: 5px 10px; background: #3498db; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                Set API Key
-            </button>
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
         `;
         
+        const title = document.createElement('div');
+        title.innerHTML = '<strong>🦉 BOS v5.0.2</strong><br>API key required for enhanced features.';
+        title.style.marginBottom = '10px';
+        
+        const button = document.createElement('button');
+        button.textContent = 'Set API Key';
+        button.style.cssText = `
+            margin-top: 10px;
+            padding: 8px 12px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+        `;
+        
+        const closeButton = document.createElement('button');
+        closeButton.textContent = '×';
+        closeButton.style.cssText = `
+            position: absolute;
+            top: 5px;
+            right: 8px;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 0;
+            width: 20px;
+            height: 20px;
+        `;
+        
+        // Proper event listeners instead of inline onclick
+        button.addEventListener('click', function() {
+            const key = window.prompt('Enter your Torn API key (Full Access recommended):');
+            if (key && key.trim()) {
+                try {
+                    GM_setValue('api-key', key.trim());
+                    prompt.remove();
+                    SkyviewLogger.info('API key saved successfully');
+                    window.location.reload();
+                } catch (error) {
+                    SkyviewLogger.error('Failed to save API key:', error);
+                    alert('Failed to save API key. Please try again.');
+                }
+            } else if (key !== null) {
+                alert('Please enter a valid API key.');
+            }
+        });
+        
+        closeButton.addEventListener('click', function() {
+            prompt.remove();
+        });
+        
+        prompt.appendChild(closeButton);
+        prompt.appendChild(title);
+        prompt.appendChild(button);
+        
         document.body.appendChild(prompt);
+        
+        SkyviewLogger.info('API key prompt displayed - click button to set key');
     }
     
     // Global CSS Styling
@@ -1022,7 +1123,7 @@
     
     // Enhanced Initialization with Auto-Detection
     function initializeSkyview() {
-        SkyviewLogger.info('BOS v5.0.1 starting...');
+        SkyviewLogger.info('BOS v5.0.2 starting...');
         
         const apiKey = storage.get('api-key');
         if (!apiKey) {
@@ -1052,14 +1153,14 @@
     
     // Version Check and Auto-Update
     const VERSION_CHECK = {
-        current: '5.0.1',
+        current: '5.0.2',
         checkForUpdates: () => {
             const lastCheck = storage.get('last-version-check');
             const now = Date.now();
             
             if (!lastCheck || now - parseInt(lastCheck) > 24 * 60 * 60 * 1000) {
                 storage.set('last-version-check', now.toString());
-                SkyviewLogger.info('Version 5.0.1 - BOS with understated presentation');
+                SkyviewLogger.info('Version 5.0.2 - BOS with functional interface');
             }
         }
     };
