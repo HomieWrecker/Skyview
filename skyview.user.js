@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         Brother Owl Skyview - Ultimate S.O.A.P. Integration v5.0.0
+// @name         BOS
 // @namespace    https://torn.com/profiles.php?XID=2353116  
-// @version      5.0.0
-// @author       Homiewrecker [2353116] - Ultimate S.O.A.P. with FF Scouter Integration
-// @description  Complete S.O.A.P. integration with AI learning engine, FF Scouter color codes, TornStats spy data, and comprehensive battle intelligence
+// @version      5.0.1
+// @author       Homiewrecker
+// @description  Grand Code's person battle eye
 // @icon         🦉
 // @match        https://www.torn.com/profiles.php?*
 // @match        https://www.torn.com/factions.php*
@@ -973,7 +973,7 @@
             border: 2px solid #e74c3c;
         `;
         prompt.innerHTML = `
-            <strong>🦉 Skyview Ultimate Integration v5.0</strong><br>
+            <strong>🦉 BOS v5.0.1</strong><br>
             API key required for enhanced features.<br>
             <button onclick="
                 const key = prompt('Enter your Torn API key:');
@@ -1022,7 +1022,7 @@
     
     // Enhanced Initialization with Auto-Detection
     function initializeSkyview() {
-        SkyviewLogger.info('Brother Owl Skyview Ultimate Integration v5.0 starting...');
+        SkyviewLogger.info('BOS v5.0.1 starting...');
         
         const apiKey = storage.get('api-key');
         if (!apiKey) {
@@ -1047,19 +1047,19 @@
             SkyviewLogger.info('Page not supported for enhanced features');
         }
         
-        SkyviewLogger.info('Brother Owl Skyview Ultimate initialization complete');
+        SkyviewLogger.info('BOS initialization complete');
     }
     
     // Version Check and Auto-Update
     const VERSION_CHECK = {
-        current: '5.0.0',
+        current: '5.0.1',
         checkForUpdates: () => {
             const lastCheck = storage.get('last-version-check');
             const now = Date.now();
             
             if (!lastCheck || now - parseInt(lastCheck) > 24 * 60 * 60 * 1000) {
                 storage.set('last-version-check', now.toString());
-                SkyviewLogger.info('Version 5.0.0 - Ultimate S.O.A.P. with AI Learning Engine and TSC Integration');
+                SkyviewLogger.info('Version 5.0.1 - BOS with understated presentation');
             }
         }
     };
